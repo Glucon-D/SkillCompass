@@ -6,8 +6,8 @@ const PointToast = ({ points = 5, show, onClose }) => {
   useEffect(() => {
     if (show) {
       const timer = setTimeout(() => {
-        onClose(); // Auto-close after 2.5s
-      }, 2500);
+        onClose(); // Auto-close after 1s
+      }, 1000);
       return () => clearTimeout(timer);
     }
   }, [show, onClose]);
