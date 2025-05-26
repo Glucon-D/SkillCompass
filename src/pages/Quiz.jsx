@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { generateQuiz, generateAINudges } from "../config/gemini"; 
+import { generateQuiz, generateAINudges } from "../config/gemini";
 import QuizCard from "../components/QuizCard";
 import NudgeCard from "../components/NudgeCard";
 import { useAuth } from "../context/AuthContext";
@@ -8,7 +8,6 @@ import { updateUserProgress, getLearningPaths } from "../config/database";
 import { AiOutlineLeft, AiOutlineRight } from "react-icons/ai";
 import { useParams, useLocation } from "react-router-dom";
 import { saveQuizScore } from "../config/database";
-
 
 const Quiz = () => {
   const [topic, setTopic] = useState("");
@@ -30,12 +29,11 @@ const Quiz = () => {
   const { user } = useAuth();
   const [performanceNudges, setPerformanceNudges] = useState([]);
 
-
   // Get parameters from URL if they exist
   const { pathId } = useParams();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const moduleIndex = queryParams.get('module');
+  const moduleIndex = queryParams.get("module");
 
   useEffect(() => {
     if (user) {
@@ -47,15 +45,19 @@ const Quiz = () => {
   useEffect(() => {
     if (pathId && paths.length > 0) {
       setSelectedPathId(pathId);
-      const path = paths.find(p => p.$id === pathId);
+      const path = paths.find((p) => p.$id === pathId);
       if (path) {
         handlePathChange(path);
 
         // If module is specified, select it
         if (moduleIndex !== null) {
           const moduleIdx = parseInt(moduleIndex);
-          if (!isNaN(moduleIdx) && moduleIdx >= 0 &&
-            path.modules && path.modules.length > moduleIdx) {
+          if (
+            !isNaN(moduleIdx) &&
+            moduleIdx >= 0 &&
+            path.modules &&
+            path.modules.length > moduleIdx
+          ) {
             // Make sure we have valid data before accessing
             if (path.modules[moduleIdx]) {
               setSelectedModule(moduleIdx.toString());
@@ -64,10 +66,13 @@ const Quiz = () => {
               const module = path.modules[moduleIdx];
               // Use the exact module title as the quiz topic (without any "Module X:" prefix)
               const moduleTitle = module.title || `Module ${moduleIdx + 1}`;
-              const cleanTitle = moduleTitle.replace(/^Module\s+\d+\s*:\s*/i, '');
+              const cleanTitle = moduleTitle.replace(
+                /^Module\s+\d+\s*:\s*/i,
+                ""
+              );
 
               // Set the clean title as topic
-              setTopic(cleanTitle || path.careerName || 'Learning Path');
+              setTopic(cleanTitle || path.careerName || "Learning Path");
             }
           }
         }
@@ -100,24 +105,28 @@ const Quiz = () => {
                   title: cleanTitle,
                   description: `Learn more about ${cleanTitle}`,
                   estimatedTime: "20–30 minutes",
-                  content: `This module introduces ${cleanTitle}`
+                  content: `This module introduces ${cleanTitle}`,
                 };
               } else {
                 return {
                   ...module,
-                  title: module.title || `Module ${idx + 1}`
+                  title: module.title || `Module ${idx + 1}`,
                 };
               }
             });
           } catch (e) {
-            console.error("Error parsing modules for path:", path.careerName, e);
+            console.error(
+              "Error parsing modules for path:",
+              path.careerName,
+              e
+            );
             modules = [];
           }
 
           return {
             ...path,
             modules,
-            careerName: path.careerName || "Unnamed Path"
+            careerName: path.careerName || "Unnamed Path",
           };
         });
 
@@ -165,30 +174,32 @@ const Quiz = () => {
       setSelectedModule(""); // Reset on path change
       setTopic(""); // Clear topic until module selected
 
-      const allContent = parsedModules.map((module) => {
-        const moduleTitle = module.title || "Unnamed Module";
-        let content = `${moduleTitle}:\n${module.description || ""}`;
+      const allContent = parsedModules
+        .map((module) => {
+          const moduleTitle = module.title || "Unnamed Module";
+          let content = `${moduleTitle}:\n${module.description || ""}`;
 
-        if (Array.isArray(module.sections)) {
-          content +=
-            "\n" +
-            module.sections
-              .map((s) => `${s?.title || ""}: ${s?.content || ""}`)
-              .filter(Boolean)
-              .join("\n\n");
-        } else if (Array.isArray(module.lessons)) {
-          content +=
-            "\n" +
-            module.lessons
-              .map((l) => `${l?.title || ""}: ${l?.content || ""}`)
-              .filter(Boolean)
-              .join("\n\n");
-        } else if (module.content) {
-          content += "\n" + module.content;
-        }
+          if (Array.isArray(module.sections)) {
+            content +=
+              "\n" +
+              module.sections
+                .map((s) => `${s?.title || ""}: ${s?.content || ""}`)
+                .filter(Boolean)
+                .join("\n\n");
+          } else if (Array.isArray(module.lessons)) {
+            content +=
+              "\n" +
+              module.lessons
+                .map((l) => `${l?.title || ""}: ${l?.content || ""}`)
+                .filter(Boolean)
+                .join("\n\n");
+          } else if (module.content) {
+            content += "\n" + module.content;
+          }
 
-        return content;
-      }).join("\n\n");
+          return content;
+        })
+        .join("\n\n");
 
       setQuizContent(allContent);
     } catch (err) {
@@ -247,13 +258,12 @@ const Quiz = () => {
     }
   };
 
-
   const handlePathSelect = (e) => {
     const pathId = e.target.value;
     setSelectedPathId(pathId);
 
     // Find the selected path object
-    const path = paths.find(p => p.$id === pathId);
+    const path = paths.find((p) => p.$id === pathId);
     if (path) {
       handlePathChange(path);
     } else {
@@ -266,35 +276,35 @@ const Quiz = () => {
     setSelectedModule("all");
   };
 
- 
   const handleGenerateQuiz = async () => {
     if (!topic || numQuestions < 1) {
       alert("Please enter a valid topic and number of questions.");
       return;
     }
-  
+
     if (!selectedPathId) {
       alert("Please select a learning path to associate with this quiz.");
       return;
     }
-  
+
     setLoading(true);
     try {
       const quizData = await generateQuiz(topic, numQuestions);
-  
+
       // Format quizData if needed to match your structure
       const formattedData = {
         topic,
         questions: quizData.questions.map((q) => ({
           question: q.question,
           answers: q.options,
-          correctAnswer: [q.options[q.correctIndex]],
+          correctAnswer: [q.correctIndex],
+
           explanation: q.explanation,
           point: 10,
           questionType: "single",
         })),
       };
-  
+
       setQuizData(formattedData);
       setUserAnswers({});
       setShowResults(false);
@@ -314,8 +324,11 @@ const Quiz = () => {
     setUserAnswers((prev) => {
       const question = quizData.questions[currentIndex];
 
-      if (question.questionType === "single") {
-        return { ...prev, [currentIndex]: [answer] }; // Only one can be selected
+      if (
+        question.questionType === "single" ||
+        question.questionType === "multiple_choice"
+      ) {
+        return { ...prev, [currentIndex]: [answer] }; // wrap in array
       }
 
       const updatedAnswers = prev[currentIndex]
@@ -332,42 +345,43 @@ const Quiz = () => {
     if (showResults && quizData && user?.$id && selectedPathId) {
       let totalScore = 0;
       let correctCount = 0;
-  
+
       quizData.questions.forEach((q, index) => {
         const correctAnswer = Array.isArray(q.correctAnswer)
           ? [...q.correctAnswer].sort()
           : [q.correctAnswer];
         const userAnswer = (userAnswers[index] || []).sort();
-  
+
         if (JSON.stringify(correctAnswer) === JSON.stringify(userAnswer)) {
           totalScore += q.point || 10;
           correctCount++;
         }
       });
-  
+
       setScore(totalScore);
       const accuracyValue = (
-        (correctCount / quizData.questions.length) * 100
+        (correctCount / quizData.questions.length) *
+        100
       ).toFixed(2);
       setAccuracy(accuracyValue);
-  
+
       // ✅ Module title
       const moduleIndex = parseInt(selectedModule);
       const moduleTitle =
         selectedModule === "all"
           ? "All Modules"
           : modules[moduleIndex]?.title || `Untitled Module`;
-  
+
       // ✅ Career path title
       const selectedPathObj = paths.find((p) => p.$id === selectedPathId);
       const careerName = selectedPathObj?.careerName || "Unknown Career";
-  
+
       // ✅ Final combined title: e.g. "Frontend Developer - Module 2: HTML Basics"
       const finalModuleName =
         selectedModule === "all"
           ? `${careerName} - All Modules`
           : `${careerName} - Module ${moduleIndex + 1}: ${moduleTitle}`;
-  
+
       // Save to assessments
       const payload = {
         userID: user.$id,
@@ -378,13 +392,22 @@ const Quiz = () => {
         feedback: `Accuracy: ${accuracyValue}%`,
         timestamp: new Date().toISOString(),
       };
-  
+
       saveQuizScore(payload)
         .then(() => console.log("✅ Quiz score saved!"))
         .catch((err) => console.error("❌ Error saving quiz result:", err));
     }
-  }, [showResults, quizData, userAnswers, user, selectedPathId, selectedModule, modules, paths]);
-  
+  }, [
+    showResults,
+    quizData,
+    userAnswers,
+    user,
+    selectedPathId,
+    selectedModule,
+    modules,
+    paths,
+  ]);
+
   useEffect(() => {
     const generatePerformanceNudges = async () => {
       if (showResults && quizData && user) {
@@ -400,27 +423,31 @@ const Quiz = () => {
         }
       }
     };
-    
+
     generatePerformanceNudges();
   }, [showResults, score, accuracy, user, selectedPath, quizData]);
 
   const handleShowResults = async () => {
     setShowResults(true);
-  
-    console.log("slectedt module",selectedModule)
+
+    const totalScore = score;
+    console.log("Total Score:", totalScore);
+
+    console.log("selected module", selectedModule);
     // 🧠 Call only after quiz is finished and results are ready
     try {
       await saveQuizScore({
         userID: user.$id,
         pathID: selectedPathId,
         moduleID: selectedModule, // ✅ keep it as index (string/number)
-        moduleName: modules[selectedModule]?.title || `Module ${parseInt(selectedModule) + 1} `,
+        moduleName:
+          modules[selectedModule]?.title ||
+          `Module ${parseInt(selectedModule) + 1} `,
         score: totalScore,
         feedback: `Accuracy: ${accuracyValue}%`,
         timestamp: new Date().toISOString(),
       });
-      
-      
+
       console.log("✅ Quiz score saved!");
     } catch (err) {
       console.error("❌ Error saving quiz result:", err);
@@ -481,7 +508,8 @@ const Quiz = () => {
             ) : (
               <div className="bg-red-900/20 p-4 rounded-xl border border-red-900/30">
                 <p className="text-red-400 text-sm">
-                  You don't have any learning paths yet. Create a learning path first.
+                  You don't have any learning paths yet. Create a learning path
+                  first.
                 </p>
               </div>
             )}
@@ -541,10 +569,11 @@ const Quiz = () => {
             <motion.button
               onClick={handleGenerateQuiz}
               disabled={!selectedPathId || !topic}
-              className={`w-full py-3 ${!selectedPathId || !topic
-                ? "bg-[#3a3a3a] cursor-not-allowed text-gray-500"
-                : "bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] text-white"
-                } rounded-xl font-medium shadow-lg text-sm sm:text-base`}
+              className={`w-full py-3 ${
+                !selectedPathId || !topic
+                  ? "bg-[#3a3a3a] cursor-not-allowed text-gray-500"
+                  : "bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] text-white"
+              } rounded-xl font-medium shadow-lg text-sm sm:text-base`}
               whileHover={{ scale: selectedPathId && topic ? 1.02 : 1 }}
               whileTap={{ scale: selectedPathId && topic ? 0.98 : 1 }}
             >
@@ -567,7 +596,9 @@ const Quiz = () => {
       {!showResults ? (
         <div className="max-w-4xl mx-auto">
           <div className="mb-6 text-center">
-            <h2 className="text-xl sm:text-2xl font-bold text-white">{topic} Quiz</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-white">
+              {topic} Quiz
+            </h2>
             <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 mt-2">
               <span className="text-xs sm:text-sm font-medium text-[#ff9d54] bg-[#ff9d54]/10 px-3 py-1 rounded-full">
                 Question {currentIndex + 1} of {quizData.questions.length}
@@ -590,10 +621,11 @@ const Quiz = () => {
           <div className="flex justify-between mt-6">
             <motion.button
               onClick={() => setCurrentIndex((prev) => Math.max(prev - 1, 0))}
-              className={`flex h-10 w-10 sm:h-14 sm:w-14 items-center justify-center rounded-full ${currentIndex === 0
-                ? "bg-[#3a3a3a]/50 text-gray-500 cursor-not-allowed"
-                : "bg-[#ff9d54] text-white"
-                }`}
+              className={`flex h-10 w-10 sm:h-14 sm:w-14 items-center justify-center rounded-full ${
+                currentIndex === 0
+                  ? "bg-[#3a3a3a]/50 text-gray-500 cursor-not-allowed"
+                  : "bg-[#ff9d54] text-white"
+              }`}
               disabled={currentIndex === 0}
               whileHover={{ scale: currentIndex === 0 ? 1 : 1.1 }}
               whileTap={{ scale: 0.9 }}
@@ -608,10 +640,11 @@ const Quiz = () => {
                   Math.min(prev + 1, quizData.questions.length - 1)
                 )
               }
-              className={`flex h-10 w-10 sm:h-14 sm:w-14 items-center justify-center rounded-full ${currentIndex === quizData.questions.length - 1
-                ? "bg-[#3a3a3a]/50 text-gray-500 cursor-not-allowed"
-                : "bg-[#ff9d54] text-white"
-                }`}
+              className={`flex h-10 w-10 sm:h-14 sm:w-14 items-center justify-center rounded-full ${
+                currentIndex === quizData.questions.length - 1
+                  ? "bg-[#3a3a3a]/50 text-gray-500 cursor-not-allowed"
+                  : "bg-[#ff9d54] text-white"
+              }`}
               disabled={currentIndex === quizData.questions.length - 1}
               whileHover={{
                 scale: currentIndex === quizData.questions.length - 1 ? 1 : 1.1,
@@ -673,7 +706,7 @@ const Quiz = () => {
 
           {/* Performance Nudges */}
           {showResults && performanceNudges.length > 0 && (
-            <motion.div 
+            <motion.div
               className="max-w-4xl mx-auto mb-6 grid grid-cols-1 md:grid-cols-2 gap-4"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -698,7 +731,7 @@ const Quiz = () => {
                 question={q.question}
                 answers={q.answers}
                 selectedAnswers={userAnswers[index] || []}
-                onAnswerSelect={() => { }}
+                onAnswerSelect={() => {}}
                 questionType={q.questionType}
                 showResults={true}
                 correctAnswer={q.correctAnswer}
