@@ -108,10 +108,10 @@ const AssessmentCard = ({
   // Determine color based on score percentage
   const getScoreColor = () => {
     if (assessmentData.score === null) return 'text-gray-400';
-    if (percentage >= 80) return 'text-green-600';
-    if (percentage >= 60) return 'text-blue-600';
-    if (percentage >= 40) return 'text-yellow-600';
-    return 'text-red-600';
+    if (percentage >= 80) return 'text-green-400';
+    if (percentage >= 60) return 'text-[#ff9d54]';
+    if (percentage >= 40) return 'text-yellow-400';
+    return 'text-red-400';
   };
 
   // Circle radius and circumference for SVG progress circle
@@ -125,12 +125,12 @@ const AssessmentCard = ({
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="bg-white rounded-2xl shadow-md p-6 border border-blue-100 flex items-center justify-center"
+        className="bg-[#2a2a2a]/70 backdrop-blur-sm rounded-2xl shadow-md p-6 border border-[#3a3a3a] flex items-center justify-center"
         style={{ minHeight: "200px" }}
       >
         <div className="flex flex-col items-center">
-          <RiLoaderLine className="animate-spin text-blue-500 text-4xl mb-2" />
-          <p className="text-sm text-gray-500">Loading assessment data...</p>
+          <RiLoaderLine className="animate-spin text-[#ff9d54] text-4xl mb-2" />
+          <p className="text-sm text-gray-400">Loading assessment data...</p>
         </div>
       </motion.div>
     );
@@ -141,7 +141,7 @@ const AssessmentCard = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="bg-white rounded-2xl shadow-md p-6 border border-blue-100"
+      className="bg-[#2a2a2a]/70 backdrop-blur-sm rounded-2xl shadow-md p-6 border border-[#3a3a3a]"
     >
       <div className="flex flex-col md:flex-row items-center gap-6">
         {/* Score Circle */}
@@ -154,7 +154,7 @@ const AssessmentCard = ({
                 cy="50"
                 r={radius}
                 fill="none"
-                stroke="#E5E7EB"
+                stroke="#3a3a3a"
                 strokeWidth="8"
               />
               
@@ -165,7 +165,7 @@ const AssessmentCard = ({
                   cy="50"
                   r={radius}
                   fill="none"
-                  stroke={percentage >= 80 ? '#10B981' : percentage >= 60 ? '#3B82F6' : percentage >= 40 ? '#F59E0B' : '#EF4444'}
+                  stroke={percentage >= 80 ? '#34D399' : percentage >= 60 ? '#ff9d54' : percentage >= 40 ? '#FBBF24' : '#F87171'}
                   strokeWidth="8"
                   strokeDasharray={circumference}
                   initial={{ strokeDashoffset: circumference }}
@@ -201,27 +201,27 @@ const AssessmentCard = ({
         {/* Details */}
         <div className="flex-1 space-y-4">
           <div>
-            <h3 className="text-xl font-bold text-blue-800 flex items-center gap-2">
-              <RiMedalLine className="text-blue-600" /> {title}
+            <h3 className="text-xl font-bold text-[#ff9d54] flex items-center gap-2">
+              <RiMedalLine className="text-[#ff9d54]" /> {title}
             </h3>
             
             {assessmentData.timeSpent && (
-              <div className="flex items-center gap-1 text-sm text-gray-500 mt-1">
+              <div className="flex items-center gap-1 text-sm text-gray-400 mt-1">
                 <RiTimeLine />
                 <span>Completed in {assessmentData.timeSpent} minutes</span>
               </div>
             )}
             
             {assessmentData.completedAt && (
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="text-xs text-gray-400 mt-1">
                 Completed on {new Date(assessmentData.completedAt).toLocaleDateString()}
               </div>
             )}
           </div>
 
-          <div className="bg-blue-50 p-4 rounded-xl">
-            <h4 className="text-blue-800 font-medium mb-1">Feedback</h4>
-            <p className="text-sm text-blue-700">
+          <div className="bg-[#ff9d54]/10 p-4 rounded-xl border border-[#ff9d54]/30">
+            <h4 className="text-[#ff9d54] font-medium mb-1">Feedback</h4>
+            <p className="text-sm text-white">
               {assessmentData.score === null 
                 ? 'Take this assessment to get personalized feedback.' 
                 : assessmentData.feedback || 'Great effort! Keep practicing to improve your skills.'}
@@ -234,7 +234,7 @@ const AssessmentCard = ({
               onClick={onRetry}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg flex items-center gap-2"
+              className="px-4 py-2 bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] text-white rounded-lg flex items-center gap-2"
             >
               <RiRefreshLine /> Retry {assessmentType}
             </motion.button>

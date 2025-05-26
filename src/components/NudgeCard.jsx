@@ -40,33 +40,33 @@ const NudgeCard = ({
     switch(type) {
       case 'recommendation':
         return {
-          gradient: 'from-indigo-500/10 to-purple-500/10',
-          iconBg: 'bg-indigo-100',
-          iconColor: 'text-indigo-600',
-          borderColor: 'border-l-indigo-500',
-          hoverBg: 'hover:bg-indigo-50',
-          buttonBg: 'bg-indigo-100 hover:bg-indigo-200',
-          buttonText: 'text-indigo-700'
+          gradient: 'from-[#ff9d54]/10 to-[#ff8a30]/10',
+          iconBg: 'bg-[#ff9d54]/20',
+          iconColor: 'text-[#ff9d54]',
+          borderColor: 'border-l-[#ff9d54]',
+          hoverBg: 'hover:bg-[#ff9d54]/5',
+          buttonBg: 'bg-[#3a3a3a] hover:bg-[#ff9d54]/20',
+          buttonText: 'text-[#ff9d54]'
         };
       case 'challenge':
         return {
-          gradient: 'from-purple-500/10 to-pink-500/10',
-          iconBg: 'bg-purple-100',
-          iconColor: 'text-purple-600',
-          borderColor: 'border-l-purple-500',
-          hoverBg: 'hover:bg-purple-50',
-          buttonBg: 'bg-purple-100 hover:bg-purple-200',
-          buttonText: 'text-purple-700'
+          gradient: 'from-[#ff9d54]/10 to-[#ff8a30]/10',
+          iconBg: 'bg-[#ff9d54]/20',
+          iconColor: 'text-[#ff9d54]',
+          borderColor: 'border-l-[#ff9d54]',
+          hoverBg: 'hover:bg-[#ff9d54]/5',
+          buttonBg: 'bg-[#3a3a3a] hover:bg-[#ff9d54]/20',
+          buttonText: 'text-[#ff9d54]'
         };
       default:
         return {
-          gradient: 'from-blue-500/10 to-sky-500/10',
-          iconBg: 'bg-blue-100',
-          iconColor: 'text-blue-600',
-          borderColor: 'border-l-blue-500',
-          hoverBg: 'hover:bg-blue-50',
-          buttonBg: 'bg-blue-100 hover:bg-blue-200',
-          buttonText: 'text-blue-700'
+          gradient: 'from-[#ff9d54]/10 to-[#ff8a30]/10',
+          iconBg: 'bg-[#ff9d54]/20',
+          iconColor: 'text-[#ff9d54]',
+          borderColor: 'border-l-[#ff9d54]',
+          hoverBg: 'hover:bg-[#ff9d54]/5',
+          buttonBg: 'bg-[#3a3a3a] hover:bg-[#ff9d54]/20',
+          buttonText: 'text-[#ff9d54]'
         };
     }
   };
@@ -90,12 +90,12 @@ const NudgeCard = ({
       transition={{ duration: 0.2 }}
       className={`
         ${elevated 
-          ? `bg-white shadow-md bg-gradient-to-br ${styles.gradient}` 
-          : 'bg-white/80'
+          ? `bg-[#2a2a2a] shadow-md bg-gradient-to-br ${styles.gradient}` 
+          : 'bg-[#2a2a2a]/80'
         } 
         p-4 rounded-xl 
         ${elevated 
-          ? 'border border-white/80' 
+          ? 'border border-[#3a3a3a]' 
           : `border-l-4 ${styles.borderColor}`
         }
         transition-all duration-200 ${styles.hoverBg}
@@ -116,7 +116,7 @@ const NudgeCard = ({
             />
           </div>
           
-          <p className="text-sm text-gray-700">{text}</p>
+          <p className="text-sm text-white">{text}</p>
           
           {onAction && actionText && (
             <motion.button

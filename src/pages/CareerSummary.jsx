@@ -164,11 +164,12 @@ const CareerSummary = () => {
             {/* PDF Content */}
             <div
               ref={summary.ref}
-              className="summary-container"            >
-              <h2>Career Summary Report for {summary.data.name}</h2>
-              <p><span className="bold-text">Career Goal:</span> {summary.data.goal}</p>
-              <p><span className="bold-text">Modules Completed:</span> {summary.data.completed}/{summary.data.total}</p>
-              <p><span className="bold-text">Overall Progress:</span> {summary.data.progress}%</p>
+              className="summary-container bg-white text-black p-6 rounded-lg"
+            >
+              <h2 className="text-xl font-bold mb-2">Career Summary Report for {summary.data.name}</h2>
+              <p className="mb-1"><span className="font-bold">Career Goal:</span> {summary.data.goal}</p>
+              <p className="mb-1"><span className="font-bold">Modules Completed:</span> {summary.data.completed}/{summary.data.total}</p>
+              <p className="mb-1"><span className="font-bold">Overall Progress:</span> {summary.data.progress}%</p>
               <hr className="my-3" />
               <div className="flex flex-col items-center justify-center mt-6 mb-4">
                 <div style={{ width: '200px', height: '200px' }}>
@@ -203,9 +204,8 @@ const CareerSummary = () => {
                   .replace(/\n/g, "<br/>");
 
                 return (
-                  <div key={idx} dangerouslySetInnerHTML={{ __html: formatted }} />
+                  <div key={idx} className="mb-3 text-black" dangerouslySetInnerHTML={{ __html: formatted }} />
                 );
-                <br />
               })}
             </div>
 
