@@ -1,4 +1,5 @@
 import { Client, Databases, Query, ID } from "appwrite";
+import { parse, format as formatDate } from "date-fns";
 
 const client = new Client()
   .setEndpoint(import.meta.env.VITE_APPWRITE_ENDPOINT)
@@ -196,8 +197,11 @@ export const markModuleComplete = async (pathId, moduleIndex) => {
       completedModules.push(moduleIndex.toString());
 
       // Push the current timestamp in ISO format
-      const currentTimestamp = new Date().toISOString();
-      timestamps.push(currentTimestamp);
+      const currentTime = new Date().toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+      });
+
+      timestamps.push(currentTime);
     }
 
     const progress = Math.round(
@@ -285,10 +289,28 @@ export const getStreakData = async (userID) => {
     .VITE_CAREER_PATHS_COLLECTION_ID;
   const ASSESSMENTS_COLLECTION_ID = import.meta.env
     .VITE_ASSESSMENTS_COLLECTION_ID;
+
   try {
     const allDates = new Set();
 
-    // 1️⃣ Get all completed module timestamps from career-paths
+    const extractDateOnly = (input) => {
+      if (!input) return null;
+
+      // If ISO string, just split at "T"
+      if (input.includes("T")) {
+        return input.split("T")[0]; // ✅ ISO case
+      }
+
+      // Handle "27/5/2025, 12:33:34 am" like format
+      try {
+        const parsed = parse(input.split(",")[0], "d/M/yyyy", new Date());
+        return formatDate(parsed, "yyyy-MM-dd"); // ✅ Converted to ISO format
+      } catch {
+        return null;
+      }
+    };
+
+    // 1️⃣ From career-paths
     const careerPathsRes = await databases.listDocuments(
       DATABASE_ID,
       CAREER_PATHS_COLLECTION_ID,
@@ -296,13 +318,13 @@ export const getStreakData = async (userID) => {
     );
 
     careerPathsRes.documents.forEach((doc) => {
-      (doc.timestamp || []).forEach((isoString) => {
-        const dateOnly = isoString.split("T")[0]; // "2025-05-26"
-        allDates.add(dateOnly);
+      (doc.timestamp || []).forEach((ts) => {
+        const formatted = extractDateOnly(ts);
+        if (formatted) allDates.add(formatted);
       });
     });
 
-    // 2️⃣ Get all quiz timestamps from assessments
+    // 2️⃣ From assessments
     const assessmentsRes = await databases.listDocuments(
       DATABASE_ID,
       ASSESSMENTS_COLLECTION_ID,
@@ -310,17 +332,11 @@ export const getStreakData = async (userID) => {
     );
 
     assessmentsRes.documents.forEach((doc) => {
-      const iso = doc.timestamp;
-      if (iso) {
-        const dateOnly = new Date(iso).toISOString().split("T")[0];
-        allDates.add(dateOnly);
-      }
+      const formatted = extractDateOnly(doc.timestamp);
+      if (formatted) allDates.add(formatted);
     });
 
-    // 3️⃣ Convert set to array and sort (optional)
-    const streakDates = Array.from(allDates).sort();
-
-    return streakDates; // ["2025-05-25", "2025-05-26", ...]
+    return Array.from(allDates).sort(); // ✅ Sorted date strings
   } catch (error) {
     console.error("❌ Failed to fetch streak data:", error);
     return [];

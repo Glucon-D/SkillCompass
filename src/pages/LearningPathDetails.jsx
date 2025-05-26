@@ -183,7 +183,11 @@ const LearningPathDetails = () => {
       const updatedTimestamps = careerPath.timestamp || [];
 
       if (!completedModules.includes(moduleIdStr)) {
-        const currentTime = new Date().toISOString();
+        const currentTime = new Date().toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+        });
+
+        console.log("Current time for completion:", currentTime);
         updatedTimestamps.push(currentTime); // Push current time for new module completion
       }
 
