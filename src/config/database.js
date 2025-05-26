@@ -340,3 +340,58 @@ export const getStreakData = async (userID) => {
     return [];
   }
 };
+
+export const updatePoints = async (userId, pointsToAdd) => {
+  const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
+  const USERS_COLLECTION_ID = import.meta.env.VITE_USERS_COLLECTION_ID;
+  try {
+    // 1. Get the user's document from the users collection
+    const res = await databases.listDocuments(
+      DATABASE_ID,
+      USERS_COLLECTION_ID,
+      [Query.equal("userID", userId)]
+    );
+
+    if (res.documents.length === 0) throw new Error("User not found");
+
+    const userDoc = res.documents[0];
+    const newPoints = (userDoc.points || 0) + pointsToAdd;
+
+    // 2. Update the points
+    await databases.updateDocument(
+      DATABASE_ID,
+      USERS_COLLECTION_ID,
+      userDoc.$id,
+      { points: newPoints }
+    );
+
+    console.log(`✅ Updated points: ${userDoc.points} → ${newPoints}`);
+    return newPoints;
+  } catch (err) {
+    console.error("❌ Failed to update points:", err.message);
+    throw err;
+  }
+};
+
+export const getPoints = async (userId) => {
+  const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
+  const USERS_COLLECTION_ID = import.meta.env.VITE_USERS_COLLECTION_ID;
+
+  try {
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      USERS_COLLECTION_ID,
+      [Query.equal("userID", userId)]
+    );
+
+    if (response.documents.length > 0) {
+      const userDoc = response.documents[0];
+      return userDoc.points || 0; // return current points or 0 if undefined
+    } else {
+      throw new Error("User not found");
+    }
+  } catch (error) {
+    console.error("❌ Failed to get user points:", error);
+    return 0; // return 0 on error
+  }
+};

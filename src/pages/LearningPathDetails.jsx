@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { updatePoints } from "../config/database";
 import {
   RiBookLine,
   RiCheckboxCircleFill,
@@ -18,6 +19,8 @@ import { databases } from "../config/database";
 import toast from "react-hot-toast";
 import { generateQuiz } from "../config/llm";
 import axios from "axios";
+import { useAuth } from "../context/AuthContext";
+import PointToast from "../components/PointToast";
 
 // Add cache management at the top
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
@@ -76,6 +79,9 @@ const LearningPathDetails = () => {
   const [loadingYoutube, setLoadingYoutube] = useState(false);
   const [youtubeVideos, setYoutubeVideos] = useState([]);
   const [youtubePlaylists, setYoutubePlaylists] = useState([]);
+  const { user } = useAuth();
+  const [showToast, setShowToast] = useState(false);
+  const [pointsEarned, setPointsEarned] = useState(0);
 
   const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
   const CAREER_PATHS_COLLECTION_ID = import.meta.env
@@ -175,23 +181,28 @@ const LearningPathDetails = () => {
     try {
       const moduleIdStr = selectedModuleIndex.toString();
 
-      // Clone current values
       const updatedCompletedModules = completedModules.includes(moduleIdStr)
         ? completedModules
         : [...completedModules, moduleIdStr];
 
       const updatedTimestamps = careerPath.timestamp || [];
 
+      let pointsEarned = 0;
+
+      // ✅ Only update time and award points if this module wasn't already completed
       if (!completedModules.includes(moduleIdStr)) {
         const currentTime = new Date().toISOString();
-        updatedTimestamps.push(currentTime); // Push current time for new module completion
+        updatedTimestamps.push(currentTime);
+
+        pointsEarned = 5; // 🎯 5 points for module completion
+        setPointsEarned(pointsEarned); // ✅ Set points to toast
+        setShowToast(true); // ✅ Trigger toast popup
       }
 
       const newProgress = Math.round(
         (updatedCompletedModules.length / careerPath.modules.length) * 100
       );
 
-      // Update in Appwrite
       await databases.updateDocument(
         DATABASE_ID,
         CAREER_PATHS_COLLECTION_ID,
@@ -213,6 +224,11 @@ const LearningPathDetails = () => {
       });
 
       toast.success("Module marked as complete!");
+
+      // ✅ Update user points in DB
+      if (pointsEarned > 0) {
+        await updatePoints(user.$id, pointsEarned);
+      }
 
       // Auto-move to next module
       if (selectedModuleIndex < careerPath.modules.length - 1) {
@@ -407,6 +423,12 @@ const LearningPathDetails = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br rounded-2xl from-[#1c1b1b] to-[#252525] p-6">
+      <PointToast
+        points={pointsEarned}
+        show={showToast}
+        onClose={() => setShowToast(false)}
+      />
+
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

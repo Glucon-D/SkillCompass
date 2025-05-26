@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateModuleContent } from "../config/llm";
+import { updatePoints } from "../config/database";
 import {
   updateLearningPathProgress,
   markModuleComplete,
@@ -24,9 +25,12 @@ import {
   RiBrainLine,
   RiLightbulbLine,
 } from "react-icons/ri";
+import PointToast from "../components/PointToast";
+import { useAuth } from "../context/AuthContext";
 
 const ModuleDetails = () => {
   const { pathId, moduleIndex } = useParams();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -38,6 +42,8 @@ const ModuleDetails = () => {
   const [moduleName, setModuleName] = useState("");
   const [modelUsed, setModelUsed] = useState("GROQ (Llama 3 70B)");
   const databases = new Databases(client);
+  const [showToast, setShowToast] = useState(false);
+  const [pointsEarned, setPointsEarned] = useState(0);
 
   // New states for topic elaboration popup
   const [isPopupOpen, setIsPopupOpen] = useState(false);
@@ -172,13 +178,18 @@ const ModuleDetails = () => {
       // ✅ Mark in backend
       const result = await markModuleComplete(pathId, moduleIndexNum);
 
+      const earned = 5;
+      await updatePoints(user.$id, earned); // your reusable DB function
+      setPointsEarned(earned);
+      setShowToast(true);
+
       // ✅ Optional: update local UI
       setIsCompleted(true);
 
       // ✅ Optional: show success or navigate back to LearningPath
       setTimeout(() => {
         navigate(`/learning-path/${pathId}`);
-      }, 1200);
+      }, 2000);
     } catch (error) {
       console.error("Error marking module complete:", error);
       setError("Failed to update module completion");
@@ -547,6 +558,12 @@ const ModuleDetails = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1c1b1b] to-[#252525] p-2 md:p-6">
+      <PointToast
+        points={pointsEarned}
+        show={showToast}
+        onClose={() => setShowToast(false)}
+      />
+
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

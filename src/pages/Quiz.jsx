@@ -8,6 +8,8 @@ import { updateUserProgress, getLearningPaths } from "../config/database";
 import { AiOutlineLeft, AiOutlineRight } from "react-icons/ai";
 import { useParams, useLocation } from "react-router-dom";
 import { saveQuizScore } from "../config/database";
+import { updatePoints } from "../config/database";
+import PointToast from "../components/PointToast";
 
 const Quiz = () => {
   const [topic, setTopic] = useState("");
@@ -28,6 +30,8 @@ const Quiz = () => {
   const [quizContent, setQuizContent] = useState("");
   const { user } = useAuth();
   const [performanceNudges, setPerformanceNudges] = useState([]);
+  const [showToast, setShowToast] = useState(false);
+  const [pointsEarned, setPointsEarned] = useState(0);
 
   // Get parameters from URL if they exist
   const { pathId } = useParams();
@@ -448,9 +452,22 @@ const Quiz = () => {
           correctCount++;
         }
       });
-      
-      const calculatedAccuracy = ((correctCount / quizData.questions.length) * 100).toFixed(2);
-      
+
+      const calculatedAccuracy = (
+        (correctCount / quizData.questions.length) *
+        100
+      ).toFixed(2);
+
+      const userScore = correctCount * 10; // Assuming each question is worth 10 points
+
+      // 🟧 Award 10 points for quiz submission (or use any logic you prefer)
+      const numericAccuracy = parseFloat(calculatedAccuracy);
+      const earned = numericAccuracy === 0 ? 10 : numericAccuracy;
+
+      await updatePoints(user.$id, earned);
+      setPointsEarned(earned);
+      setShowToast(true);
+
       await saveQuizScore({
         userID: user.$id,
         pathID: selectedPathId,
@@ -458,7 +475,7 @@ const Quiz = () => {
         moduleName:
           modules[selectedModule]?.title ||
           `Module ${parseInt(selectedModule) + 1} `,
-        score: totalScore,
+        score: userScore,
         feedback: `Accuracy: ${calculatedAccuracy}%`,
         timestamp: new Date().toISOString(),
       });
@@ -608,6 +625,12 @@ const Quiz = () => {
 
   return (
     <div className="min-h-[calc(100vh-80px)] bg-gradient-to-b from-[#1c1b1b] via-[#252525] to-[#1c1b1b] p-4 sm:p-8">
+      <PointToast
+        points={pointsEarned}
+        show={showToast}
+        onClose={() => setShowToast(false)}
+      />
+
       {!showResults ? (
         <div className="max-w-4xl mx-auto">
           <div className="mb-6 text-center">
@@ -681,7 +704,7 @@ const Quiz = () => {
                 }}
                 whileTap={{ scale: 0.95 }}
               >
-                Show Result
+                Submit
               </motion.button>
             </div>
           )}
