@@ -9,12 +9,13 @@ import {
 } from "react-icons/ri";
 import { useState, useEffect, useRef } from "react";
 import { useInView } from "framer-motion";
-import IllustrationImage from '../assets/Illustration.jpg'
-
+import IllustrationImage from "../assets/Illustration.jpg";
+import { useAuth } from "../context/AuthContext";
 
 const AnimatedCounter = ({ target, duration = 4000 }) => {
   const [count, setCount] = useState(0);
   const ref = useRef(null);
+
   const isInView = useInView(ref, { once: true });
 
   useEffect(() => {
@@ -47,10 +48,10 @@ const AnimatedCounter = ({ target, duration = 4000 }) => {
   const display = target.includes("K")
     ? `${Math.floor(count / 1000)}K+`
     : target.includes("+")
-      ? `${count}+`
-      : target.includes("%")
-        ? `${count}%`
-        : count;
+    ? `${count}+`
+    : target.includes("%")
+    ? `${count}%`
+    : count;
 
   return <span ref={ref}>{display}</span>;
 };
@@ -129,19 +130,22 @@ const testimonials = [
     name: "Sarah Johnson",
     role: "Frontend Dev",
     avatar: "https://randomuser.me/api/portraits/women/1.jpg",
-    quote: "PathGenie completely transformed how I learn. The AI recommendations are spot-on!",
+    quote:
+      "PathGenie completely transformed how I learn. The AI recommendations are spot-on!",
   },
   {
     name: "Mike Chen",
     role: "Engineering Student",
     avatar: "https://randomuser.me/api/portraits/men/2.jpg",
-    quote: "I love the interactive paths and quizzes — they keep me engaged and motivated.",
+    quote:
+      "I love the interactive paths and quizzes — they keep me engaged and motivated.",
   },
   {
     name: "Emily Davis",
     role: "Data Analyst",
     avatar: "https://randomuser.me/api/portraits/women/3.jpg",
-    quote: "The smart progress tracking helped me identify and fix my weak spots easily.",
+    quote:
+      "The smart progress tracking helped me identify and fix my weak spots easily.",
   },
 ];
 
@@ -166,6 +170,15 @@ const faqs = [
 
 const Home = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const handleStartLearning = () => {
+    if (user) {
+      navigate("/dashboard");
+    } else {
+      navigate("/login");
+    }
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -173,18 +186,18 @@ const Home = () => {
       opacity: 1,
       transition: {
         staggerChildren: 0.1,
-        delayChildren: 0.3
-      }
-    }
+        delayChildren: 0.3,
+      },
+    },
   };
 
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
-    visible: { 
-      opacity: 1, 
+    visible: {
+      opacity: 1,
       y: 0,
-      transition: { duration: 0.5 }
-    }
+      transition: { duration: 0.5 },
+    },
   };
 
   return (
@@ -193,13 +206,13 @@ const Home = () => {
       <section className="relative w-full bg-gradient-to-br from-[#2a2a2a] via-[#1c1b1b] to-[#1c1b1b] overflow-hidden">
         {/* Background Pattern */}
         <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
-        
+
         <div className="relative max-w-7xl mx-auto px-4 py-12 md:py-20 lg:py-28">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-gradient-radial from-[#ff9d54]/20 via-transparent to-transparent opacity-50"></div>
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative">
             <div className="text-center lg:text-left order-2 lg:order-1 z-10">
-              <motion.div 
+              <motion.div
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
@@ -211,55 +224,68 @@ const Home = () => {
                   </span>
                 </motion.div>
 
-                <motion.h1 variants={itemVariants} className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight">
+                <motion.h1
+                  variants={itemVariants}
+                  className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight"
+                >
                   <span className="block font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#ff9d54] via-[#ffb77e] to-[#ff9d54] animate-gradient-x">
                     Master Skills
                   </span>
-                  <span className="block mt-2 text-white">With AI Guidance</span>
+                  <span className="block mt-2 text-white">
+                    With AI Guidance
+                  </span>
                 </motion.h1>
 
-                <motion.p variants={itemVariants} className="max-w-2xl mx-auto lg:mx-0 text-base sm:text-lg lg:text-xl text-gray-300">
-                  Experience the future of learning with personalized AI content, real-time feedback, and hands-on practice.
+                <motion.p
+                  variants={itemVariants}
+                  className="max-w-2xl mx-auto lg:mx-0 text-base sm:text-lg lg:text-xl text-gray-300"
+                >
+                  Experience the future of learning with personalized AI
+                  content, real-time feedback, and hands-on practice.
                 </motion.p>
 
-                <motion.div variants={itemVariants} className="flex flex-col sm:flex-row justify-center lg:justify-start gap-4">
+                <motion.div
+                  variants={itemVariants}
+                  className="flex flex-col sm:flex-row justify-center lg:justify-start gap-4"
+                >
                   <button
-                    onClick={() => navigate("/signup")}
+                    onClick={handleStartLearning}
                     className="group px-8 py-4 bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] text-white rounded-xl 
                     shadow-xl shadow-[#ff9d54]/20 hover:shadow-2xl hover:shadow-[#ff9d54]/30 
                     transform hover:-translate-y-1 transition-all duration-200
                     border border-white/10 backdrop-blur-sm flex items-center justify-center gap-2"
                   >
-                    Start Learning Free 
+                    Start Learning Free
                     <RiArrowRightLine className="group-hover:translate-x-1 transition-transform" />
                   </button>
-                  <button className="px-8 py-4 bg-[#2a2a2a]/80 backdrop-blur-sm border border-[#3a3a3a] text-white 
+                  <button
+                    className="px-8 py-4 bg-[#2a2a2a]/80 backdrop-blur-sm border border-[#3a3a3a] text-white 
                     font-medium rounded-xl hover:bg-[#333333] hover:border-[#ff9d54] transform hover:-translate-y-1 
                     transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
                   >
-                    See How It Works 
+                    See How It Works
                     <RiPlayCircleLine className="text-[#ff9d54] text-xl group-hover:scale-110 transition-transform" />
                   </button>
                 </motion.div>
               </motion.div>
             </div>
 
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }} 
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, delay: 0.2 }}
               className="order-1 lg:order-2 relative"
             >
               <div className="relative z-10 rounded-3xl overflow-hidden shadow-2xl border border-[#3a3a3a] bg-[#1c1b1b]">
                 <div className="absolute inset-0 bg-[#1c1b1b] z-0"></div>
-                <img 
-                  className="w-full h-auto transform hover:scale-105 transition-transform duration-700 mix-blend-multiply relative z-10" 
-                  src={IllustrationImage} 
+                <img
+                  className="w-full h-auto transform hover:scale-105 transition-transform duration-700 relative z-10"
+                  src={IllustrationImage}
                   alt="AI Learning Illustration"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-[#1c1b1b]/50 to-[#1c1b1b]/30 z-20"></div>
               </div>
-              
+
               {/* Decorative elements */}
               <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#ff9d54]/20 rounded-full blur-3xl"></div>
               <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-[#ff9d54]/20 rounded-full blur-3xl"></div>
@@ -292,11 +318,17 @@ const Home = () => {
                 transition={{ delay: index * 0.2 }}
                 className={`rounded-2xl p-6 md:p-8 transition-all hover:shadow-2xl shadow-md border ${feature.cardBg} border-[#3a3a3a] hover:border-[#ff9d54]`}
               >
-                <div className={`w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-xl mx-auto mb-5 md:mb-6 ${feature.iconBg}`}>
+                <div
+                  className={`w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-xl mx-auto mb-5 md:mb-6 ${feature.iconBg}`}
+                >
                   {feature.icon}
                 </div>
-                <h3 className="text-lg md:text-xl font-semibold text-white mb-2">{feature.title}</h3>
-                <p className="text-gray-300 text-sm md:text-base">{feature.description}</p>
+                <h3 className="text-lg md:text-xl font-semibold text-white mb-2">
+                  {feature.title}
+                </h3>
+                <p className="text-gray-300 text-sm md:text-base">
+                  {feature.description}
+                </p>
               </motion.div>
             ))}
           </div>
@@ -318,7 +350,9 @@ const Home = () => {
               <div className="text-3xl md:text-4xl font-bold">
                 <AnimatedCounter target={stat.number} />
               </div>
-              <div className="text-white/80 text-xs md:text-sm mt-1">{stat.label}</div>
+              <div className="text-white/80 text-xs md:text-sm mt-1">
+                {stat.label}
+              </div>
             </motion.div>
           ))}
         </div>
@@ -342,13 +376,21 @@ const Home = () => {
                 className="bg-[#1c1b1b] p-5 md:p-6 rounded-2xl shadow-lg text-left border border-[#3a3a3a]"
               >
                 <div className="flex items-center gap-3 md:gap-4 mb-3 md:mb-4">
-                  <img src={t.avatar} alt={t.name} className="w-10 h-10 md:w-12 md:h-12 rounded-full" />
+                  <img
+                    src={t.avatar}
+                    alt={t.name}
+                    className="w-10 h-10 md:w-12 md:h-12 rounded-full"
+                  />
                   <div>
                     <div className="font-semibold text-white">{t.name}</div>
-                    <div className="text-xs md:text-sm text-gray-400">{t.role}</div>
+                    <div className="text-xs md:text-sm text-gray-400">
+                      {t.role}
+                    </div>
                   </div>
                 </div>
-                <p className="text-gray-300 text-xs md:text-sm italic">"{t.quote}"</p>
+                <p className="text-gray-300 text-xs md:text-sm italic">
+                  "{t.quote}"
+                </p>
               </motion.div>
             ))}
           </div>
@@ -382,12 +424,13 @@ const Home = () => {
             Ready to Elevate Your Skills with AI?
           </motion.h2>
           <p className="text-gray-300 mb-6 md:mb-8 text-base md:text-lg">
-            Join thousands of learners transforming their future through smart, guided learning.
+            Join thousands of learners transforming their future through smart,
+            guided learning.
           </p>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => navigate("/signup")}
+            onClick={handleStartLearning}
             className="px-6 md:px-8 py-3 md:py-4 bg-[#ff9d54] text-white rounded-lg shadow-lg shadow-[#ff9d54]/20 
               hover:bg-gradient-to-r hover:from-[#ff9d54] hover:to-[#ff8a30] 
               hover:shadow-xl hover:shadow-[#ff9d54]/30 transition-all duration-100 
@@ -404,22 +447,35 @@ const Home = () => {
           background-size: 200% 200%;
           animation: gradient-x 15s ease infinite;
         }
-        
+
         @keyframes gradient-x {
-          0% { background-position: 0% 50% }
-          50% { background-position: 100% 50% }
-          100% { background-position: 0% 50% }
+          0% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
+          100% {
+            background-position: 0% 50%;
+          }
         }
-        
+
         .bg-grid-pattern {
-          background-image: 
-            linear-gradient(to right, #ff9d54 1px, transparent 1px),
+          background-image: linear-gradient(
+              to right,
+              #ff9d54 1px,
+              transparent 1px
+            ),
             linear-gradient(to bottom, #ff9d54 1px, transparent 1px);
           background-size: 40px 40px;
         }
-        
+
         .bg-gradient-radial {
-          background-image: radial-gradient(circle at center, var(--tw-gradient-from) 0%, var(--tw-gradient-to) 100%);
+          background-image: radial-gradient(
+            circle at center,
+            var(--tw-gradient-from) 0%,
+            var(--tw-gradient-to) 100%
+          );
         }
       `}</style>
     </div>

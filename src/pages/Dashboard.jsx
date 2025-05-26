@@ -6,7 +6,7 @@ import { account } from "../config/appwrite";
 import { databases } from "../config/database";
 import { Query } from "appwrite";
 import { toast } from "react-hot-toast";
-import { generateAINudges } from "../config/gemini";
+import { generateAINudges } from "../config/llm";
 import NudgeCard from "../components/NudgeCard";
 
 const Dashboard = () => {

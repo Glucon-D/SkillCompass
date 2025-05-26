@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { generateChatResponse } from '../config/gemini';
+import { generateChatResponse } from '../config/llm';
 import { 
   RiSendPlaneFill, 
   RiUserLine, 

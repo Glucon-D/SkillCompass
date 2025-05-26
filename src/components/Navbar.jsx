@@ -1,133 +1,79 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { databases } from "../config/database";
 import { useAuth } from "../context/AuthContext";
-import { RiFireFill, RiMagicLine } from "react-icons/ri"; // Changed from RiBrainLine to RiMagicLine for the genie theme
-import { format, differenceInDays, parseISO } from "date-fns";
-import { Query } from "appwrite";
+import {
+  RiFireFill,
+  RiMagicLine,
+  RiCoinFill,
+  RiTrophyFill,
+} from "react-icons/ri"; // Added RiCoinFill for points
+import { differenceInDays, parseISO, format } from "date-fns";
+import { getStreakData } from "../config/database";
+import { getPoints } from "../config/database";
 
 const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const { user, loading, logout, isAuthenticated } = useAuth();
-
+  const [points, setPoints] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
 
+  // ✅ Function to calculate current streak
+  const calculateCurrentStreak = (dates) => {
+    if (!Array.isArray(dates) || dates.length === 0) return 0;
+
+    const today = format(new Date(), "yyyy-MM-dd"); // normalize to date only
+    const todayDate = parseISO(today);
+
+    const sorted = [...new Set(dates)].sort();
+
+    let streak = 0;
+
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      const date = parseISO(sorted[i]);
+      const diff = differenceInDays(todayDate, date);
+
+      if (diff === streak) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  };
+
+  // ✅ Load user points
   useEffect(() => {
-    if (user) fetchUserProgress();
-  }, [user]);
+    if (!loading && user?.$id) {
+      const fetchPoints = async () => {
+        const currentPoints = await getPoints(user.$id);
+        setPoints(currentPoints);
+      };
+      fetchPoints();
+    }
+  }, [user, loading]);
 
-  const fetchUserProgress = async () => {
-    try {
-      // Get quiz data from career-paths collection instead of user_progress
-      const response = await databases.listDocuments(
-        import.meta.env.VITE_APPWRITE_DATABASE_ID,
-        import.meta.env.VITE_CAREER_PATHS_COLLECTION_ID,
-        [Query.equal("userID", user.$id)]
-      );
-
-      // Process all career paths to find quiz scores
-      const paths = response.documents || [];
-      let quizScores = [];
-
-      // Check if any assessments data exists in the career paths
-      paths.forEach(path => {
-        // If the path has quizScores, add them to our collection
-        if (path.quizScores) {
-          const pathQuizzes = JSON.parse(path.quizScores);
-          if (Array.isArray(pathQuizzes) && pathQuizzes.length > 0) {
-            quizScores = [...quizScores, ...pathQuizzes];
-          }
+  // ✅ Load user streak
+  useEffect(() => {
+    if (!loading && user?.$id) {
+      const fetchStreak = async () => {
+        try {
+          const streakDates = await getStreakData(user.$id);
+          const streak = calculateCurrentStreak(streakDates);
+          setCurrentStreak(streak);
+        } catch (err) {
+          console.error("Error fetching streak data:", err);
+          setCurrentStreak(0);
         }
-
-        // If there are assessment dates from completed modules
-        if (path.completedModules) {
-          const completedModules = JSON.parse(path.completedModules || '[]');
-          if (completedModules.length > 0) {
-            // Use completion dates as quiz dates for streak calculation
-            completedModules.forEach((module, index) => {
-              // If module has completion date, use it to calculate streak
-              if (path.updatedAt) {
-                quizScores.push({
-                  topic: `Module ${module + 1}`,
-                  date: path.updatedAt,
-                  score: 100,
-                  accuracy: 100
-                });
-              }
-            });
-          }
-        }
-      });
-
-      calculateCurrentStreak(quizScores);
-    } catch (error) {
-      console.error("Error fetching career paths:", error);
+      };
+      fetchStreak();
     }
-  };
+  }, [user, loading]);
 
-  const calculateCurrentStreak = (quizScores) => {
-    if (!quizScores.length) return;
-
-    const dates = quizScores.map((q) => format(parseISO(q.date), "yyyy-MM-dd"));
-    const sortedDates = [...new Set(dates)].sort();
-
-    let tempStreak = 1;
-    for (let i = 1; i < sortedDates.length; i++) {
-      const diff = differenceInDays(
-        parseISO(sortedDates[i]),
-        parseISO(sortedDates[i - 1])
-      );
-      if (diff === 1) tempStreak++;
-      else tempStreak = 1;
-    }
-
-    const today = format(new Date(), "yyyy-MM-dd");
-    const lastQuizDate = sortedDates[sortedDates.length - 1];
-    const daysSinceLastQuiz = differenceInDays(
-      parseISO(today),
-      parseISO(lastQuizDate)
-    );
-
-    setCurrentStreak(daysSinceLastQuiz <= 1 ? tempStreak : 0);
-  };
-
-  const handleLogin = () => {
-    navigate("/login");
-  };
-
-  const handleSignup = () => {
-    navigate("/signup");
-  };
-
-  const handleLogout = () => {
-    navigate("/");
-  };
-
-  const getUserDisplay = () => {
-    if (loading) {
-      return (
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#ff9d54]/20 rounded-full animate-pulse" />
-          <div className="w-20 h-4 bg-[#ff9d54]/20 rounded animate-pulse" />
-        </div>
-      );
-    }
-
-    if (!user) return null;
-
-    return (
-      <>
-        <div className="w-8 h-8 bg-[#ff9d54]/20 rounded-full flex items-center justify-center">
-          {user.$id ? user.$id[0].toUpperCase() : "👤"}
-        </div>
-        <span className="text-white font-medium">
-          {user.name || user.email?.split("@")[0] || user.$id}
-        </span>
-      </>
-    );
-  };
+  const handleLogin = () => navigate("/login");
+  const handleSignup = () => navigate("/signup");
 
   const UserDropdown = () => (
     <AnimatePresence>
@@ -235,8 +181,10 @@ const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
             >
               <RiMagicLine className="text-white text-lg md:text-xl" />
             </motion.div>
-            <span className="text-lg md:text-xl font-serif font-bold bg-gradient-to-r from-[#ff9d54] 
-              to-[#ff8a30] bg-clip-text text-transparent truncate">
+            <span
+              className="text-lg md:text-xl font-serif font-bold bg-gradient-to-r from-[#ff9d54] 
+              to-[#ff8a30] bg-clip-text text-transparent truncate"
+            >
               PathGenie
             </span>
           </motion.div>
@@ -244,11 +192,30 @@ const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
 
         {isAuthenticated ? (
           <div className="flex items-center gap-2 md:gap-6">
-            <motion.span className="flex gap-1 items-center text-sm md:text-base text-white">
-              <RiFireFill className="text-xl md:text-2xl text-[#ff9d54]" />
-              {currentStreak}
-            </motion.span>
-            
+            {/* Streak Counter with enhanced styling */}
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              className="flex gap-1 items-center text-sm md:text-base bg-[#2a2a2a]/60 px-2 md:px-3 py-1 rounded-full"
+            >
+              <RiFireFill className="text-lg md:text-xl text-[#ff9d54]" />
+              <span className="font-medium text-white">{currentStreak}</span>
+              <span className="text-xs text-gray-400 hidden sm:inline">
+                day streak
+              </span>
+            </motion.div>
+
+            {/* Points Counter with new icon and enhanced styling */}
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              className="flex gap-1 items-center text-sm md:text-base bg-[#2a2a2a]/60 px-2 md:px-3 py-1 rounded-full"
+            >
+              <RiCoinFill className="text-lg md:text-xl text-[#ff9d54]" />
+              <span className="font-medium text-white">{points}</span>
+              <span className="text-xs text-gray-400 hidden sm:inline">
+                points
+              </span>
+            </motion.div>
+
             {/* Desktop User Menu */}
             <div className="hidden md:block relative">
               <motion.div
@@ -371,7 +338,23 @@ const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
                         <p className="font-medium text-white">
                           {user?.name || user?.email?.split("@")[0]}
                         </p>
-                        <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+                        <p className="text-xs text-gray-400 truncate">
+                          {user?.email}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Add Points and Streak in mobile menu */}
+                    <div className="flex gap-4 mt-3">
+                      <div className="flex gap-1 items-center bg-[#3a3a3a]/50 px-3 py-1.5 rounded-lg">
+                        <RiFireFill className="text-[#ff9d54]" />
+                        <span className="text-white">{currentStreak}</span>
+                        <span className="text-xs text-gray-400">streak</span>
+                      </div>
+                      <div className="flex gap-1 items-center bg-[#3a3a3a]/50 px-3 py-1.5 rounded-lg">
+                        <RiCoinFill className="text-[#ff9d54]" />
+                        <span className="text-white">{points}</span>
+                        <span className="text-xs text-gray-400">points</span>
                       </div>
                     </div>
                   </div>

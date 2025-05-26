@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { updatePoints } from "../config/database";
 import {
   RiBookLine,
   RiCheckboxCircleFill,
@@ -11,24 +12,26 @@ import {
   RiQuestionLine,
   RiPlayCircleLine,
   RiYoutubeLine,
-  RiRefreshLine
+  RiRefreshLine,
 } from "react-icons/ri";
 import { account } from "../config/appwrite";
 import { databases } from "../config/database";
 import toast from "react-hot-toast";
-import { generateQuiz } from "../config/gemini";
-import axios from 'axios';
+import { generateQuiz } from "../config/llm";
+import axios from "axios";
+import { useAuth } from "../context/AuthContext";
+import PointToast from "../components/PointToast";
 
 // Add cache management at the top
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-const YT_CACHE_KEY = 'yt_cache';
-const SEARCH_CACHE_KEY = 'search_cache';
+const YT_CACHE_KEY = "yt_cache";
+const SEARCH_CACHE_KEY = "search_cache";
 
 const getCache = (key, searchTerm) => {
   try {
     const cached = localStorage.getItem(`${key}_${searchTerm}`);
     if (!cached) return null;
-    
+
     const { data, timestamp } = JSON.parse(cached);
     if (Date.now() - timestamp > CACHE_DURATION) {
       localStorage.removeItem(`${key}_${searchTerm}`);
@@ -42,20 +45,23 @@ const getCache = (key, searchTerm) => {
 
 const setCache = (key, searchTerm, data) => {
   try {
-    localStorage.setItem(`${key}_${searchTerm}`, JSON.stringify({
-      data,
-      timestamp: Date.now()
-    }));
+    localStorage.setItem(
+      `${key}_${searchTerm}`,
+      JSON.stringify({
+        data,
+        timestamp: Date.now(),
+      })
+    );
   } catch (error) {
-    console.error('Cache set error:', error);
+    console.error("Cache set error:", error);
   }
 };
 
 const extractCoreTopic = (pathName) => {
   // Remove possessive names and common path words
   return pathName
-    .replace(/^[^']+['']s\s+/i, '') // Remove possessive names like "Ayush's"
-    .replace(/\b(path|domination|bridge|journey|guide|mastery)\b/gi, '') // Remove common path words
+    .replace(/^[^']+['']s\s+/i, "") // Remove possessive names like "Ayush's"
+    .replace(/\b(path|domination|bridge|journey|guide|mastery)\b/gi, "") // Remove common path words
     .trim();
 };
 
@@ -73,9 +79,13 @@ const LearningPathDetails = () => {
   const [loadingYoutube, setLoadingYoutube] = useState(false);
   const [youtubeVideos, setYoutubeVideos] = useState([]);
   const [youtubePlaylists, setYoutubePlaylists] = useState([]);
+  const { user } = useAuth();
+  const [showToast, setShowToast] = useState(false);
+  const [pointsEarned, setPointsEarned] = useState(0);
 
   const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
-  const CAREER_PATHS_COLLECTION_ID = import.meta.env.VITE_CAREER_PATHS_COLLECTION_ID;
+  const CAREER_PATHS_COLLECTION_ID = import.meta.env
+    .VITE_CAREER_PATHS_COLLECTION_ID;
   const YT_API_KEY = import.meta.env.VITE_YT_API_KEY;
   const SERPER_API_KEY = import.meta.env.VITE_SERPER_API_KEY;
 
@@ -87,7 +97,7 @@ const LearningPathDetails = () => {
     if (careerPath?.careerName) {
       const cachedData = getCache(SEARCH_CACHE_KEY, careerPath.careerName);
       if (cachedData) {
-        console.log('Using cached data');
+        console.log("Using cached data");
         setYoutubeVideos(cachedData);
         return;
       }
@@ -106,14 +116,20 @@ const LearningPathDetails = () => {
       let modules = [];
       try {
         modules = JSON.parse(response.modules || "[]");
-        if (modules.length > 0 && typeof modules[0] === 'string') {
+        if (modules.length > 0 && typeof modules[0] === "string") {
           modules = modules.map((module) => {
-            if (typeof module === 'string') {
+            if (typeof module === "string") {
               return {
                 title: module,
-                description: `Learn more about ${module.split(':').pop().trim()}`,
+                description: `Learn more about ${module
+                  .split(":")
+                  .pop()
+                  .trim()}`,
                 estimatedTime: "20-30 minutes",
-                content: `This module will introduce you to ${module.split(':').pop().trim()}`
+                content: `This module will introduce you to ${module
+                  .split(":")
+                  .pop()
+                  .trim()}`,
               };
             }
             return module;
@@ -125,20 +141,22 @@ const LearningPathDetails = () => {
       const parsedPath = {
         ...response,
         modules: modules,
-        completedModules: JSON.parse(response.completedModules || "[]")
+        completedModules: JSON.parse(response.completedModules || "[]"),
       };
       setCareerPath(parsedPath);
       setCompletedModules(parsedPath.completedModules);
       const firstIncompleteIndex = parsedPath.modules.findIndex(
         (_, index) => !parsedPath.completedModules.includes(index.toString())
       );
-      setSelectedModuleIndex(firstIncompleteIndex >= 0 ? firstIncompleteIndex : 0);
-      
+      setSelectedModuleIndex(
+        firstIncompleteIndex >= 0 ? firstIncompleteIndex : 0
+      );
+
       // Fetch YouTube videos after setting career path
       try {
         await fetchYoutubeContent(parsedPath.careerName);
       } catch (youtubeError) {
-        console.error('YouTube fetch error:', youtubeError);
+        console.error("YouTube fetch error:", youtubeError);
         // Don't fail the entire career path load if YouTube fails
       }
     } catch (error) {
@@ -159,11 +177,27 @@ const LearningPathDetails = () => {
 
   const handleMarkComplete = async () => {
     if (selectedModuleIndex === null) return;
+
     try {
       const moduleIdStr = selectedModuleIndex.toString();
+
       const updatedCompletedModules = completedModules.includes(moduleIdStr)
         ? completedModules
         : [...completedModules, moduleIdStr];
+
+      const updatedTimestamps = careerPath.timestamp || [];
+
+      let pointsEarned = 0;
+
+      // ✅ Only update time and award points if this module wasn't already completed
+      if (!completedModules.includes(moduleIdStr)) {
+        const currentTime = new Date().toISOString();
+        updatedTimestamps.push(currentTime);
+
+        pointsEarned = 5; // 🎯 5 points for module completion
+        setPointsEarned(pointsEarned); // ✅ Set points to toast
+        setShowToast(true); // ✅ Trigger toast popup
+      }
 
       const newProgress = Math.round(
         (updatedCompletedModules.length / careerPath.modules.length) * 100
@@ -175,94 +209,121 @@ const LearningPathDetails = () => {
         id,
         {
           completedModules: JSON.stringify(updatedCompletedModules),
-          progress: newProgress
+          progress: newProgress,
+          timestamp: updatedTimestamps,
         }
       );
 
+      // Update local state
       setCompletedModules(updatedCompletedModules);
       setCareerPath({
         ...careerPath,
         completedModules: updatedCompletedModules,
-        progress: newProgress
+        progress: newProgress,
+        timestamp: updatedTimestamps,
       });
 
       toast.success("Module marked as complete!");
 
+      // ✅ Update user points in DB
+      if (pointsEarned > 0) {
+        await updatePoints(user.$id, pointsEarned);
+      }
+
+      // Auto-move to next module
       if (selectedModuleIndex < careerPath.modules.length - 1) {
         setSelectedModuleIndex(selectedModuleIndex + 1);
       }
     } catch (error) {
+      console.error("❌ Error updating module:", error);
       toast.error("Failed to mark module as complete");
     }
   };
 
   const handleRedirectToQuiz = () => {
     if (!careerPath?.modules[selectedModuleIndex]) return;
-    
+
     const moduleTitle = careerPath.modules[selectedModuleIndex].title;
-    
+
     // Navigate to the quiz page with path ID and module index as URL parameters
     navigate(`/quiz`);
   };
 
   const fetchYoutubeContent = async (searchTerm) => {
-    if (!searchTerm || typeof searchTerm !== 'string') return;
-    
+    if (!searchTerm || typeof searchTerm !== "string") return;
+
     try {
       setLoadingYoutube(true);
       const cleanTopic = searchTerm
-        .replace(/'s/g, '')
-        .replace(/Path/g, '')
-        .replace(/Domination/g, '')
-        .split(' ')
-        .filter(word => 
-          !['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for'].includes(word.toLowerCase())
+        .replace(/'s/g, "")
+        .replace(/Path/g, "")
+        .replace(/Domination/g, "")
+        .split(" ")
+        .filter(
+          (word) =>
+            ![
+              "the",
+              "a",
+              "an",
+              "and",
+              "or",
+              "but",
+              "in",
+              "on",
+              "at",
+              "to",
+              "for",
+            ].includes(word.toLowerCase())
         )
-        .join(' ');
+        .join(" ");
 
       const searchConfig = {
-        method: 'post',
-        url: 'https://google.serper.dev/search',
-        headers: { 
-          'X-API-KEY': SERPER_API_KEY,
-          'Content-Type': 'application/json'
+        method: "post",
+        url: "https://google.serper.dev/search",
+        headers: {
+          "X-API-KEY": SERPER_API_KEY,
+          "Content-Type": "application/json",
         },
         data: {
           q: `${cleanTopic} programming tutorial course youtube`,
           num: 3,
-          type: "videos"
-        }
+          type: "videos",
+        },
       };
 
       const response = await axios(searchConfig);
       const videos = response.data?.videos || [];
-      
+
       // Updated video formatting with proper thumbnail handling
-      const formattedVideos = videos.map(video => ({
-        id: { videoId: video.link.split('v=')[1]?.split('&')[0] || '' },
+      const formattedVideos = videos.map((video) => ({
+        id: { videoId: video.link.split("v=")[1]?.split("&")[0] || "" },
         snippet: {
           title: video.title,
-          channelTitle: video.channel || 'YouTube Channel',
+          channelTitle: video.channel || "YouTube Channel",
           thumbnails: {
-            high: { 
-              url: video.thumbnail || `https://i.ytimg.com/vi/${video.link.split('v=')[1]?.split('&')[0]}/hqdefault.jpg`
-            }
-          }
-        }
+            high: {
+              url:
+                video.thumbnail ||
+                `https://i.ytimg.com/vi/${
+                  video.link.split("v=")[1]?.split("&")[0]
+                }/hqdefault.jpg`,
+            },
+          },
+        },
       }));
 
       // Filter out any videos without valid IDs
-      const validVideos = formattedVideos.filter(video => 
-        video.id.videoId && 
-        video.id.videoId.length > 0 &&
-        video.snippet.thumbnails.high.url
+      const validVideos = formattedVideos.filter(
+        (video) =>
+          video.id.videoId &&
+          video.id.videoId.length > 0 &&
+          video.snippet.thumbnails.high.url
       );
 
       setYoutubeVideos(validVideos.slice(0, 3));
-      console.log('Formatted videos:', validVideos); // Debug log
-
+      console.log("Formatted videos:", validVideos); // Debug log
     } catch (error) {
-      console.error('Failed to fetch video content:', error);
+      console.error("Failed to fetch video content:", error);
       setYoutubeVideos([]);
     } finally {
       setLoadingYoutube(false);
@@ -343,10 +404,12 @@ const LearningPathDetails = () => {
           <div className="w-12 h-12 bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
             <RiQuestionLine className="text-red-400 w-6 h-6" />
           </div>
-          <h2 className="text-xl font-semibold text-red-400 mb-2">Error Loading Career Path</h2>
+          <h2 className="text-xl font-semibold text-red-400 mb-2">
+            Error Loading Career Path
+          </h2>
           <p className="text-red-400/80 mb-4">{error}</p>
           <button
-            onClick={() => navigate('/learning-path')}
+            onClick={() => navigate("/learning-path")}
             className="px-4 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded-lg transition-colors"
           >
             Back to Career Paths
@@ -360,6 +423,12 @@ const LearningPathDetails = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br rounded-2xl from-[#1c1b1b] to-[#252525] p-6">
+      <PointToast
+        points={pointsEarned}
+        show={showToast}
+        onClose={() => setShowToast(false)}
+      />
+
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -374,7 +443,7 @@ const LearningPathDetails = () => {
           <div className="space-y-2 md:space-y-4">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/learning-path')}
+                onClick={() => navigate("/learning-path")}
                 className="p-2 bg-[#3a3a3a] hover:bg-[#444444] rounded-lg transition-colors"
               >
                 <RiArrowLeftLine className="w-5 h-5 text-[#ff9d54]" />
@@ -384,7 +453,8 @@ const LearningPathDetails = () => {
                   {careerPath?.careerName}
                 </h1>
                 <p className="text-gray-400 mt-1">
-                  {careerPath?.modules.length} modules • {completedModules.length} completed
+                  {careerPath?.modules.length} modules •{" "}
+                  {completedModules.length} completed
                 </p>
               </div>
             </div>
@@ -392,7 +462,9 @@ const LearningPathDetails = () => {
             <div className="space-y-2">
               <div className="flex justify-between text-sm text-gray-400">
                 <span>Overall Progress</span>
-                <span className="font-medium text-[#ff9d54]">{careerPath?.progress}%</span>
+                <span className="font-medium text-[#ff9d54]">
+                  {careerPath?.progress}%
+                </span>
               </div>
               <div className="w-full bg-[#3a3a3a] rounded-full h-3">
                 <motion.div
@@ -413,7 +485,9 @@ const LearningPathDetails = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Modules List */}
           <div className="lg:col-span-1 space-y-4">
-            <h2 className="text-lg font-semibold text-white pl-2">Career Modules</h2>
+            <h2 className="text-lg font-semibold text-white pl-2">
+              Career Modules
+            </h2>
             <div className="bg-[#2a2a2a]/70 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-[#3a3a3a] max-h-[500px] overflow-y-auto">
               {careerPath?.modules.map((module, index) => (
                 <motion.div
@@ -421,18 +495,20 @@ const LearningPathDetails = () => {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className={`p-3 mb-2 rounded-lg cursor-pointer transition-all ${selectedModuleIndex === index
+                  className={`p-3 mb-2 rounded-lg cursor-pointer transition-all ${
+                    selectedModuleIndex === index
                       ? "bg-[#3a3a3a] border-l-4 border-[#ff9d54]"
                       : "hover:bg-[#3a3a3a]/50"
-                    }`}
+                  }`}
                   onClick={() => handleModuleClick(index)}
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold ${completedModules.includes(index.toString())
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold ${
+                        completedModules.includes(index.toString())
                           ? "bg-green-900/30 text-green-400"
                           : "bg-[#ff9d54]/20 text-[#ff9d54]"
-                        }`}
+                      }`}
                     >
                       {completedModules.includes(index.toString()) ? (
                         <RiCheckboxCircleFill />
@@ -444,7 +520,6 @@ const LearningPathDetails = () => {
                       <h3 className="text-sm font-medium text-white whitespace-normal break-words">
                         {module.title}
                       </h3>
-
                     </div>
                   </div>
                 </motion.div>
@@ -465,10 +540,14 @@ const LearningPathDetails = () => {
                 <div className="bg-[#2a2a2a]/70 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-[#3a3a3a]">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h2 className="text-xl font-semibold text-white">{selectedModule.title}</h2>
+                      <h2 className="text-xl font-semibold text-white">
+                        {selectedModule.title}
+                      </h2>
                       <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
                         <RiTimeLine />
-                        <span>{selectedModule.estimatedTime || "20-30 minutes"}</span>
+                        <span>
+                          {selectedModule.estimatedTime || "20-30 minutes"}
+                        </span>
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -481,7 +560,9 @@ const LearningPathDetails = () => {
                         <RiArrowRightLine />
                       </button>
 
-                      {completedModules.includes(selectedModuleIndex.toString()) ? (
+                      {completedModules.includes(
+                        selectedModuleIndex.toString()
+                      ) ? (
                         <div className="px-3 py-1 bg-green-900/30 text-green-400 rounded-full text-sm font-medium flex items-center gap-1">
                           <RiCheckboxCircleFill />
                           <span>Completed</span>
@@ -513,9 +594,13 @@ const LearningPathDetails = () => {
                       {selectedModule.content && (
                         <div className="mt-4">{selectedModule.content}</div>
                       )}
-                      {!selectedModule.description && !selectedModule.content && (
-                        <p>This module focuses on {selectedModule.title} concepts and techniques.</p>
-                      )}
+                      {!selectedModule.description &&
+                        !selectedModule.content && (
+                          <p>
+                            This module focuses on {selectedModule.title}{" "}
+                            concepts and techniques.
+                          </p>
+                        )}
 
                       <div className="mt-6 flex items-center justify-center">
                         <motion.button
@@ -540,7 +625,9 @@ const LearningPathDetails = () => {
                   </h3>
 
                   <div className="text-center py-4">
-                    <p className="text-gray-400 mb-4">Test your knowledge of this module with a quick quiz.</p>
+                    <p className="text-gray-400 mb-4">
+                      Test your knowledge of this module with a quick quiz.
+                    </p>
                     <button
                       onClick={handleRedirectToQuiz}
                       className="px-4 py-2 bg-[#3a3a3a] text-[#ff9d54] hover:bg-[#444444] rounded-lg transition-colors flex items-center gap-2 mx-auto"
@@ -561,10 +648,11 @@ const LearningPathDetails = () => {
                         handleModuleClick(selectedModuleIndex - 1);
                       }
                     }}
-                    className={`px-4 py-2 rounded-lg flex items-center gap-2 ${selectedModuleIndex > 0
+                    className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+                      selectedModuleIndex > 0
                         ? "bg-[#3a3a3a] text-white hover:bg-[#444444]"
                         : "bg-[#2a2a2a] text-gray-500 cursor-not-allowed"
-                      }`}
+                    }`}
                     disabled={selectedModuleIndex === 0}
                   >
                     <RiArrowLeftLine />
@@ -577,11 +665,14 @@ const LearningPathDetails = () => {
                         handleModuleClick(selectedModuleIndex + 1);
                       }
                     }}
-                    className={`px-4 py-2 rounded-lg flex items-center gap-2 ${selectedModuleIndex < careerPath.modules.length - 1
+                    className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+                      selectedModuleIndex < careerPath.modules.length - 1
                         ? "bg-[#3a3a3a] text-white hover:bg-[#444444]"
                         : "bg-[#2a2a2a] text-gray-500 cursor-not-allowed"
-                      }`}
-                    disabled={selectedModuleIndex === careerPath.modules.length - 1}
+                    }`}
+                    disabled={
+                      selectedModuleIndex === careerPath.modules.length - 1
+                    }
                   >
                     <span>Next</span>
                     <RiArrowRightLine />
@@ -590,7 +681,9 @@ const LearningPathDetails = () => {
               </motion.div>
             ) : (
               <div className="bg-[#2a2a2a]/70 backdrop-blur-sm rounded-xl p-8 shadow-lg border border-[#3a3a3a] text-center">
-                <p className="text-gray-400">Select a module to view its details</p>
+                <p className="text-gray-400">
+                  Select a module to view its details
+                </p>
               </div>
             )}
           </div>

@@ -7,7 +7,7 @@ import { account } from "../config/appwrite";
 import { databases } from "../config/database";
 import { ID, Query } from "appwrite";
 import { toast } from "react-hot-toast";
-import { generateLearningPath, generatePersonalizedCareerPaths } from "../config/gemini";
+import { generateLearningPath, generatePersonalizedCareerPaths } from "../config/llm";
 import { useAuth } from "../context/AuthContext";
 
 const ProfileForm = () => {

@@ -1,17 +1,21 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { RiCheckboxCircleLine, RiCloseCircleLine, RiInformationLine } from 'react-icons/ri';
+import React from "react";
+import { motion } from "framer-motion";
+import {
+  RiCheckboxCircleLine,
+  RiCloseCircleLine,
+  RiInformationLine,
+} from "react-icons/ri";
 
-const QuizCard = ({ 
-  question, 
-  answers, 
-  selectedAnswers, 
-  onAnswerSelect, 
-  questionType, 
-  showResults, 
+const QuizCard = ({
+  question,
+  answers,
+  selectedAnswers,
+  onAnswerSelect,
+  questionType,
+  showResults,
   correctAnswer,
   userAnswers,
-  explanation 
+  explanation,
 }) => {
   // Convert correctAnswer to array if it's not already
   const correctAnswerArray = Array.isArray(correctAnswer)
@@ -48,15 +52,15 @@ const QuizCard = ({
   const handleAnswerClick = (answerIndex) => {
     if (showResults) return;
 
-    if (questionType === "multiple_choice") {
-      // For multiple choice, only one answer can be selected
-      onAnswerSelect([answerIndex]);
-    } else {
-      // For multiple answer questions, toggle the selection
+    if (questionType === "multiple_answer") {
+      // ✅ Allow toggling multiple selections
       const newSelectedAnswers = selectedAnswers.includes(answerIndex)
         ? selectedAnswers.filter((index) => index !== answerIndex)
         : [...selectedAnswers, answerIndex];
-      onAnswerSelect(newSelectedAnswers);
+      onAnswerSelect(answerIndex); // just pass the clicked index
+    } else {
+      // ✅ Only one answer allowed
+      onAnswerSelect(answerIndex); // just pass the clicked index
     }
   };
 
@@ -102,7 +106,9 @@ const QuizCard = ({
                 ) : showResults && isAnswerSelected(index) ? (
                   <RiCloseCircleLine className="text-red-400" />
                 ) : (
-                  <span className="text-xs">{String.fromCharCode(65 + index)}</span>
+                  <span className="text-xs">
+                    {String.fromCharCode(65 + index)}
+                  </span>
                 )}
               </div>
               <span className="text-sm sm:text-base">{answer}</span>
@@ -121,7 +127,9 @@ const QuizCard = ({
           <div className="flex items-start gap-2">
             <RiInformationLine className="text-[#ff9d54] text-lg flex-shrink-0 mt-1" />
             <div>
-              <h4 className="text-sm font-medium text-[#ff9d54] mb-1">Explanation</h4>
+              <h4 className="text-sm font-medium text-[#ff9d54] mb-1">
+                Explanation
+              </h4>
               <p className="text-sm text-gray-300">{explanation}</p>
             </div>
           </div>

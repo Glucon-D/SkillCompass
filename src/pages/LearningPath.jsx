@@ -22,7 +22,7 @@ import {
   RiDeleteBin5Line,
   RiCloseLine
 } from 'react-icons/ri';
-import { generateAINudges } from "../config/gemini";
+import { generateAINudges } from "../config/llm";
 import NudgeCard from "../components/NudgeCard";
 import { toast } from 'react-hot-toast';
 

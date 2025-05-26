@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { generateModuleContent } from "../config/gemini";
+import { generateModuleContent } from "../config/llm";
+import { updatePoints } from "../config/database";
 import {
   updateLearningPathProgress,
   markModuleComplete,
@@ -22,11 +23,14 @@ import {
   RiCloseLine,
   RiSearchLine,
   RiBrainLine,
-  RiLightbulbLine
+  RiLightbulbLine,
 } from "react-icons/ri";
+import PointToast from "../components/PointToast";
+import { useAuth } from "../context/AuthContext";
 
 const ModuleDetails = () => {
   const { pathId, moduleIndex } = useParams();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -38,7 +42,9 @@ const ModuleDetails = () => {
   const [moduleName, setModuleName] = useState("");
   const [modelUsed, setModelUsed] = useState("GROQ (Llama 3 70B)");
   const databases = new Databases(client);
-  
+  const [showToast, setShowToast] = useState(false);
+  const [pointsEarned, setPointsEarned] = useState(0);
+
   // New states for topic elaboration popup
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [elaborationTopic, setElaborationTopic] = useState("");
@@ -76,7 +82,7 @@ const ModuleDetails = () => {
       let attempts = 0;
       let success = false;
       let aiResponse;
-      
+
       // Retry logic for handling potential hallucinations
       while (attempts <= maxRetries && !success) {
         try {
@@ -85,33 +91,37 @@ const ModuleDetails = () => {
             includeExamples: expanded,
             // Add specific constraints to prevent hallucinations
             constrainToFacts: true,
-            preventHallucination: true
+            preventHallucination: true,
           });
-          
+
           // Check if a response header was returned indicating which model was used
           if (aiResponse.modelUsed) {
             setModelUsed(aiResponse.modelUsed);
           } else {
             setModelUsed("GROQ (Llama 3)"); // Default if not specified
           }
-          
+
           // Validate the response has essential properties
-          if (!aiResponse || !aiResponse.sections || aiResponse.sections.length === 0) {
+          if (
+            !aiResponse ||
+            !aiResponse.sections ||
+            aiResponse.sections.length === 0
+          ) {
             throw new Error("Invalid content structure");
           }
-          
+
           // Additional validation for content quality
-          const isContentValid = aiResponse.sections.every(section => {
+          const isContentValid = aiResponse.sections.every((section) => {
             return (
-              section.title && 
-              section.content && 
+              section.title &&
+              section.content &&
               section.content.length > 100 && // Minimum content length
               !section.content.includes("I don't know") && // Avoid uncertainty phrases
               !section.content.includes("I'm not sure") &&
-              !section.content.includes("As an AI")  // Avoid self-references
+              !section.content.includes("As an AI") // Avoid self-references
             );
           });
-          
+
           if (isContentValid) {
             success = true;
           } else {
@@ -119,12 +129,14 @@ const ModuleDetails = () => {
           }
         } catch (err) {
           attempts++;
-          console.warn(`Attempt ${attempts}/${maxRetries} failed: ${err.message}`);
+          console.warn(
+            `Attempt ${attempts}/${maxRetries} failed: ${err.message}`
+          );
           if (attempts > maxRetries) {
             throw err; // Re-throw if we've exhausted retries
           }
           // Short delay before retry
-          await new Promise(r => setTimeout(r, 1000));
+          await new Promise((r) => setTimeout(r, 1000));
         }
       }
 
@@ -158,21 +170,26 @@ const ModuleDetails = () => {
     setError("");
     loadContent(false); // Reload content from scratch
   };
-  
+
   const handleComplete = async () => {
     try {
       const moduleIndexNum = parseInt(moduleIndex, 10);
-  
+
       // ✅ Mark in backend
       const result = await markModuleComplete(pathId, moduleIndexNum);
-  
+
+      const earned = 5;
+      await updatePoints(user.$id, earned); // your reusable DB function
+      setPointsEarned(earned);
+      setShowToast(true);
+
       // ✅ Optional: update local UI
       setIsCompleted(true);
-  
+
       // ✅ Optional: show success or navigate back to LearningPath
       setTimeout(() => {
         navigate(`/learning-path/${pathId}`);
-      }, 1200);
+      }, 2000);
     } catch (error) {
       console.error("Error marking module complete:", error);
       setError("Failed to update module completion");
@@ -189,12 +206,12 @@ const ModuleDetails = () => {
     try {
       // Build a more specific prompt for the topic
       const fullTopic = `${moduleName}: ${topic}`;
-      
+
       const elaboration = await generateModuleContent(fullTopic, {
         detailed: true,
         includeExamples: true,
         constrainToFacts: true,
-        preventHallucination: true
+        preventHallucination: true,
       });
 
       if (elaboration.modelUsed) {
@@ -207,7 +224,7 @@ const ModuleDetails = () => {
       console.error("Error elaborating on topic:", error);
       setElaborationContent({
         title: topic,
-        error: "Failed to generate elaboration. Please try again."
+        error: "Failed to generate elaboration. Please try again.",
       });
     } finally {
       setLoadingElaboration(false);
@@ -281,16 +298,30 @@ const ModuleDetails = () => {
           className="text-center bg-[#2a2a2a]/80 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-red-900/30 max-w-md"
         >
           <div className="text-red-400 flex flex-col items-center mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-12 w-12"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
             </svg>
-            <h2 className="text-xl font-bold mt-4 text-red-400">Content Generation Failed</h2>
+            <h2 className="text-xl font-bold mt-4 text-red-400">
+              Content Generation Failed
+            </h2>
           </div>
-          
+
           <p className="text-gray-300 mb-6">
-            {error || "We couldn't generate content for this module. This might be due to a temporary issue with our AI service."}
+            {error ||
+              "We couldn't generate content for this module. This might be due to a temporary issue with our AI service."}
           </p>
-          
+
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -300,7 +331,7 @@ const ModuleDetails = () => {
             >
               <RiRefreshLine /> Try Again
             </motion.button>
-            
+
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -346,29 +377,39 @@ const ModuleDetails = () => {
                   {elaborationTopic}
                 </h2>
               </div>
-              <button 
+              <button
                 onClick={closePopup}
                 className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-full transition-colors"
               >
                 <RiCloseLine className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
               </button>
             </div>
-            
+
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-3 sm:p-6">
               {loadingElaboration ? (
                 <div className="flex flex-col items-center justify-center h-40 sm:h-64">
                   <motion.div
                     animate={{ rotate: 360 }}
-                    transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                    transition={{
+                      duration: 1.5,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
                     className="w-8 sm:w-10 h-8 sm:h-10 border-3 sm:border-4 border-blue-200 border-t-blue-600 rounded-full mb-4"
                   />
-                  <p className="text-sm sm:text-base text-gray-600">Generating detailed explanation...</p>
-                  <p className="text-xs sm:text-sm text-gray-500 mt-2">Using GROQ's advanced LLMs</p>
+                  <p className="text-sm sm:text-base text-gray-600">
+                    Generating detailed explanation...
+                  </p>
+                  <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                    Using GROQ's advanced LLMs
+                  </p>
                 </div>
               ) : elaborationContent?.error ? (
                 <div className="bg-red-50 p-4 sm:p-6 rounded-xl text-center">
-                  <p className="text-red-600 text-sm sm:text-base">{elaborationContent.error}</p>
+                  <p className="text-red-600 text-sm sm:text-base">
+                    {elaborationContent.error}
+                  </p>
                   <button
                     onClick={() => handleElaborate(elaborationTopic)}
                     className="mt-4 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg flex items-center gap-2 mx-auto text-sm"
@@ -379,18 +420,23 @@ const ModuleDetails = () => {
               ) : elaborationContent ? (
                 <div className="space-y-4 sm:space-y-6">
                   <div className="border-l-4 border-blue-500 pl-3 sm:pl-4 py-1.5 sm:py-2 italic text-gray-600 bg-blue-50/50 rounded-r-lg text-xs sm:text-sm">
-                    <p>A deeper exploration into {elaborationTopic}, expanding on the concepts covered in the module.</p>
+                    <p>
+                      A deeper exploration into {elaborationTopic}, expanding on
+                      the concepts covered in the module.
+                    </p>
                   </div>
-                  
+
                   {elaborationContent.sections?.map((section, idx) => (
-                    <motion.div 
+                    <motion.div
                       key={idx}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: idx * 0.1 }}
                       className="bg-white border border-gray-200 p-3 sm:p-5 rounded-xl shadow-sm"
                     >
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2 sm:mb-3">{section.title}</h3>
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2 sm:mb-3">
+                        {section.title}
+                      </h3>
                       <div className="prose prose-sm max-w-none text-xs sm:text-sm">
                         <ReactMarkdown components={renderers}>
                           {section.content}
@@ -404,7 +450,9 @@ const ModuleDetails = () => {
                             <span>{section.codeExample.language}</span>
                           </div>
                           <SyntaxHighlighter
-                            language={section.codeExample.language || "javascript"}
+                            language={
+                              section.codeExample.language || "javascript"
+                            }
                             style={vscDarkPlus}
                             className="!m-0 !text-xs sm:!text-sm"
                             showLineNumbers={false}
@@ -421,10 +469,14 @@ const ModuleDetails = () => {
 
                       {section.keyPoints && section.keyPoints.length > 0 && (
                         <div className="mt-3 sm:mt-4 bg-blue-50 p-2 sm:p-3 rounded-lg">
-                          <h4 className="text-xs sm:text-sm font-medium text-blue-700 mb-1 sm:mb-2">Key Takeaways</h4>
+                          <h4 className="text-xs sm:text-sm font-medium text-blue-700 mb-1 sm:mb-2">
+                            Key Takeaways
+                          </h4>
                           <ul className="list-disc pl-4 sm:pl-5 text-xs sm:text-sm text-gray-700">
                             {section.keyPoints.map((point, idx) => (
-                              <li key={idx} className="mb-0.5 sm:mb-1">{point}</li>
+                              <li key={idx} className="mb-0.5 sm:mb-1">
+                                {point}
+                              </li>
                             ))}
                           </ul>
                         </div>
@@ -434,7 +486,7 @@ const ModuleDetails = () => {
                 </div>
               ) : null}
             </div>
-            
+
             {/* Footer */}
             <div className="p-2 sm:p-4 border-t border-gray-200 bg-gray-50 text-center text-xs text-gray-500">
               Content powered by {modelUsed}
@@ -462,7 +514,10 @@ const ModuleDetails = () => {
           </SyntaxHighlighter>
         </div>
       ) : (
-        <code className="bg-purple-50 px-1.5 py-0.5 rounded text-xs sm:text-sm" {...props}>
+        <code
+          className="bg-purple-50 px-1.5 py-0.5 rounded text-xs sm:text-sm"
+          {...props}
+        >
           {children}
         </code>
       );
@@ -494,15 +549,21 @@ const ModuleDetails = () => {
           <RiLightbulbLine className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Elaborate
         </motion.button>
       </div>
-    )
+    ),
   };
 
   const handleBackToPath = () => {
     navigate(`/learning-path/${pathId}`);
   };
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1c1b1b] to-[#252525] p-2 md:p-6">
+      <PointToast
+        points={pointsEarned}
+        show={showToast}
+        onClose={() => setShowToast(false)}
+      />
+
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -519,9 +580,11 @@ const ModuleDetails = () => {
             className="p-1.5 sm:p-2 bg-[#3a3a3a] hover:bg-[#ff9d54]/20 rounded-lg transition-colors flex items-center gap-1.5 sm:gap-2"
           >
             <RiArrowLeftLine className="w-4 h-4 sm:w-5 sm:h-5 text-[#ff9d54]" />
-            <span className="text-[#ff9d54] hidden sm:inline text-sm">Back to Path</span>
+            <span className="text-[#ff9d54] hidden sm:inline text-sm">
+              Back to Path
+            </span>
           </button>
-          
+
           <div className="text-xs sm:text-sm text-gray-400">
             Module {parseInt(moduleIndex, 10) + 1}
           </div>
@@ -541,7 +604,9 @@ const ModuleDetails = () => {
               <h1 className="text-lg md:text-3xl font-bold bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] bg-clip-text text-transparent line-clamp-2">
                 {content?.title || moduleName}
               </h1>
-              <p className="text-[10px] sm:text-xs text-gray-400 mt-1">Content powered by {modelUsed}</p>
+              <p className="text-[10px] sm:text-xs text-gray-400 mt-1">
+                Content powered by {modelUsed}
+              </p>
             </div>
           </div>
         </motion.div>
@@ -568,10 +633,12 @@ const ModuleDetails = () => {
                   <h2 className="text-base sm:text-lg md:text-2xl font-semibold bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] bg-clip-text text-transparent flex items-center gap-2 sm:gap-3">
                     <span className="line-clamp-2">{section.title}</span>
                     {section.isAdvanced && (
-                      <span className="text-[8px] sm:text-xs bg-[#ff9d54]/20 text-[#ff9d54] px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">Advanced</span>
+                      <span className="text-[8px] sm:text-xs bg-[#ff9d54]/20 text-[#ff9d54] px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
+                        Advanced
+                      </span>
                     )}
                   </h2>
-                  
+
                   {/* Add Elaborate button to section headers */}
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -579,7 +646,8 @@ const ModuleDetails = () => {
                     onClick={() => handleElaborate(section.title)}
                     className="opacity-0 group-hover:opacity-100 text-[10px] sm:text-xs px-2 py-1 bg-[#3a3a3a] hover:bg-[#ff9d54]/20 text-[#ff9d54] rounded-lg flex items-center gap-1 transition-opacity"
                   >
-                    <RiLightbulbLine className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Elaborate
+                    <RiLightbulbLine className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{" "}
+                    Elaborate
                   </motion.button>
                 </div>
               </div>
@@ -624,19 +692,24 @@ const ModuleDetails = () => {
                   </motion.div>
                 </div>
               )}
-              
+
               {/* Key Points with Elaboration button */}
               {section.keyPoints && section.keyPoints.length > 0 && (
                 <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-[#ff9d54]/10 rounded-lg border border-[#ff9d54]/30 group">
                   <div className="flex justify-between items-center mb-1.5 sm:mb-2">
-                    <h3 className="font-medium text-[#ff9d54] text-sm sm:text-base">Key Points</h3>
+                    <h3 className="font-medium text-[#ff9d54] text-sm sm:text-base">
+                      Key Points
+                    </h3>
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      onClick={() => handleElaborate(`Key Points of ${section.title}`)}
+                      onClick={() =>
+                        handleElaborate(`Key Points of ${section.title}`)
+                      }
                       className="opacity-0 group-hover:opacity-100 text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 bg-[#3a3a3a] hover:bg-[#ff9d54]/20 text-[#ff9d54] rounded flex items-center gap-1 transition-opacity"
                     >
-                      <RiSearchLine className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Explore Further
+                      <RiSearchLine className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{" "}
+                      Explore Further
                     </motion.button>
                   </div>
                   <ul className="list-disc pl-4 sm:pl-5 text-gray-300 space-y-0.5 sm:space-y-1 text-xs sm:text-sm">
@@ -648,10 +721,10 @@ const ModuleDetails = () => {
               )}
             </motion.div>
           ))}
-          
+
           {/* Loading more content indicator */}
           {isLoadingMore && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="flex justify-center items-center p-4 sm:p-8"
@@ -662,7 +735,9 @@ const ModuleDetails = () => {
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                   className="w-4 h-4 sm:w-6 sm:h-6 border-2 sm:border-3 border-blue-200 border-t-blue-600 rounded-full"
                 />
-                <span className="text-blue-600 font-medium text-xs sm:text-sm">Loading more content...</span>
+                <span className="text-blue-600 font-medium text-xs sm:text-sm">
+                  Loading more content...
+                </span>
               </div>
             </motion.div>
           )}
