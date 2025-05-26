@@ -13,6 +13,7 @@ import {
   RiMenuLine,
   RiAwardLine,
   RiUserLine,
+  RiTrophyFill,
 } from "react-icons/ri";
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
@@ -69,7 +70,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       active: location.pathname === "/chat",
     },
     {
-      icon: <RiMessage3Line className="text-xl" />,
+      icon: <RiTrophyFill className="text-xl" />,
       label: "Leaderboard",
       path: "/leaderboard",
       active: location.pathname === "/leaderboard",
