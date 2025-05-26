@@ -197,9 +197,7 @@ export const markModuleComplete = async (pathId, moduleIndex) => {
       completedModules.push(moduleIndex.toString());
 
       // Push the current timestamp in ISO format
-      const currentTime = new Date().toLocaleString("en-IN", {
-        timeZone: "Asia/Kolkata",
-      });
+      const currentTime = new Date().toISOString();
 
       timestamps.push(currentTime);
     }

@@ -390,9 +390,7 @@ const Quiz = () => {
         moduleName: finalModuleName,
         score: totalScore,
         feedback: `Accuracy: ${accuracyValue}%`,
-        timestamp: new Date().toLocaleString("en-IN", {
-          timeZone: "Asia/Kolkata",
-        }),
+        timestamp: new Date().toISOString(),
       };
 
       saveQuizScore(payload)
