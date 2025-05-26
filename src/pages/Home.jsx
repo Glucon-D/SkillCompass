@@ -253,7 +253,7 @@ const Home = () => {
               <div className="relative z-10 rounded-3xl overflow-hidden shadow-2xl border border-[#3a3a3a] bg-[#1c1b1b]">
                 <div className="absolute inset-0 bg-[#1c1b1b] z-0"></div>
                 <img 
-                  className="w-full h-auto transform hover:scale-105 transition-transform duration-700 mix-blend-multiply relative z-10" 
+                  className="w-full h-auto transform hover:scale-105 transition-transform duration-700 relative z-10" 
                   src={IllustrationImage} 
                   alt="AI Learning Illustration"
                 />
