@@ -7,8 +7,8 @@ const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODELS = [
   "llama3-70b-8192", // Primary model - most capable
   "llama3-8b-8192", // First fallback - good balance of speed and quality
-  "mixtral-8x7b-32768", // Second fallback - different architecture
-  "gemma-7b-it", // Third fallback - different model family
+  "llama-3.1-8b-instant", // Second fallback - different architecture
+  "gemma2-9b-it", // Third fallback - different model family
 ];
 
 const MAX_RETRIES = 3;
