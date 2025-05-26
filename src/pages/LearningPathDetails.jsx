@@ -16,7 +16,7 @@ import {
 import { account } from "../config/appwrite";
 import { databases } from "../config/database";
 import toast from "react-hot-toast";
-import { generateQuiz } from "../config/gemini";
+import { generateQuiz } from "../config/llm";
 import axios from "axios";
 
 // Add cache management at the top

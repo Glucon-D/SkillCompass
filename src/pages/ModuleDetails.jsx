@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { generateModuleContent } from "../config/gemini";
+import { generateModuleContent } from "../config/llm";
 import {
   updateLearningPathProgress,
   markModuleComplete,

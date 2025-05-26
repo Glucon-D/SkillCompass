@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { generateFlashcards, generateAINudges } from "../config/gemini";
+import { generateFlashcards, generateAINudges } from "../config/llm";
 import { updateUserProgress } from "../config/database";
 import { useAuth } from "../context/AuthContext";
 import { getLearningPaths } from "../config/database"; // Import this too if not already

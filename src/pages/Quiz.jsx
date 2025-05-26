@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { generateQuiz, generateAINudges } from "../config/gemini";
+import { generateQuiz, generateAINudges } from "../config/llm";
 import QuizCard from "../components/QuizCard";
 import NudgeCard from "../components/NudgeCard";
 import { useAuth } from "../context/AuthContext";
@@ -436,6 +436,21 @@ const Quiz = () => {
     console.log("selected module", selectedModule);
     // 🧠 Call only after quiz is finished and results are ready
     try {
+      // Calculate accuracy directly here to ensure it's available
+      let correctCount = 0;
+      quizData.questions.forEach((q, index) => {
+        const correctAnswer = Array.isArray(q.correctAnswer)
+          ? [...q.correctAnswer].sort()
+          : [q.correctAnswer];
+        const userAnswer = (userAnswers[index] || []).sort();
+
+        if (JSON.stringify(correctAnswer) === JSON.stringify(userAnswer)) {
+          correctCount++;
+        }
+      });
+      
+      const calculatedAccuracy = ((correctCount / quizData.questions.length) * 100).toFixed(2);
+      
       await saveQuizScore({
         userID: user.$id,
         pathID: selectedPathId,
@@ -444,7 +459,7 @@ const Quiz = () => {
           modules[selectedModule]?.title ||
           `Module ${parseInt(selectedModule) + 1} `,
         score: totalScore,
-        feedback: `Accuracy: ${accuracyValue}%`,
+        feedback: `Accuracy: ${calculatedAccuracy}%`,
         timestamp: new Date().toISOString(),
       });
 

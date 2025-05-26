@@ -6,7 +6,7 @@ import { RiArrowRightLine, RiDownloadLine, RiUserStarLine, RiCheckboxCircleFill 
 import { PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { account } from "../config/appwrite";
 import { databases } from "../config/database";
-import { generateCareerSummary } from "../config/gemini";
+import { generateCareerSummary } from "../config/llm";
 import { Query } from 'appwrite';
 import { toast } from 'react-hot-toast';
 import html2pdf from 'html2pdf.js';
