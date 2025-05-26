@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { RiFireFill, RiMagicLine } from "react-icons/ri"; // Changed from RiBrainLine to RiMagicLine for the genie theme
+import { RiFireFill, RiMagicLine, RiCoinFill, RiTrophyFill } from "react-icons/ri"; // Added RiCoinFill for points
 import { format, differenceInDays, parseISO } from "date-fns";
 import { getStreakData } from "../config/database";
 import { getPoints } from "../config/database";
@@ -184,15 +184,25 @@ const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
 
         {isAuthenticated ? (
           <div className="flex items-center gap-2 md:gap-6">
-            <motion.span className="flex gap-1 items-center text-sm md:text-base text-white">
-              <RiFireFill className="text-xl md:text-2xl text-[#ff9d54]" />
-              {currentStreak}
-            </motion.span>
+            {/* Streak Counter with enhanced styling */}
+            <motion.div 
+              whileHover={{ scale: 1.05 }}
+              className="flex gap-1 items-center text-sm md:text-base bg-[#2a2a2a]/60 px-2 md:px-3 py-1 rounded-full"
+            >
+              <RiFireFill className="text-lg md:text-xl text-[#ff9d54]" />
+              <span className="font-medium text-white">{currentStreak}</span>
+              <span className="text-xs text-gray-400 hidden sm:inline">day streak</span>
+            </motion.div>
 
-            <motion.span className="flex gap-1 items-center text-sm md:text-base text-white">
-              <RiFireFill className="text-xl md:text-2xl text-[#ff9d54]" />
-              {points}
-            </motion.span>
+            {/* Points Counter with new icon and enhanced styling */}
+            <motion.div 
+              whileHover={{ scale: 1.05 }}
+              className="flex gap-1 items-center text-sm md:text-base bg-[#2a2a2a]/60 px-2 md:px-3 py-1 rounded-full"
+            >
+              <RiCoinFill className="text-lg md:text-xl text-[#ff9d54]" />
+              <span className="font-medium text-white">{points}</span>
+              <span className="text-xs text-gray-400 hidden sm:inline">points</span>
+            </motion.div>
 
             {/* Desktop User Menu */}
             <div className="hidden md:block relative">
@@ -319,6 +329,20 @@ const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
                         <p className="text-xs text-gray-400 truncate">
                           {user?.email}
                         </p>
+                      </div>
+                    </div>
+                    
+                    {/* Add Points and Streak in mobile menu */}
+                    <div className="flex gap-4 mt-3">
+                      <div className="flex gap-1 items-center bg-[#3a3a3a]/50 px-3 py-1.5 rounded-lg">
+                        <RiFireFill className="text-[#ff9d54]" />
+                        <span className="text-white">{currentStreak}</span>
+                        <span className="text-xs text-gray-400">streak</span>
+                      </div>
+                      <div className="flex gap-1 items-center bg-[#3a3a3a]/50 px-3 py-1.5 rounded-lg">
+                        <RiCoinFill className="text-[#ff9d54]" />
+                        <span className="text-white">{points}</span>
+                        <span className="text-xs text-gray-400">points</span>
                       </div>
                     </div>
                   </div>
