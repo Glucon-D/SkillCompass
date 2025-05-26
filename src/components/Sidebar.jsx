@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useLocation } from "react-router-dom";
-import { 
+import {
   RiDashboardLine,
   RiRocketLine,
   RiBookLine,
@@ -12,15 +12,15 @@ import {
   RiCloseLine,
   RiMenuLine,
   RiAwardLine,
-  RiUserLine
-} from 'react-icons/ri';
+  RiUserLine,
+} from "react-icons/ri";
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
   const menuItems = [
-    { 
+    {
       icon: <RiDashboardLine className="text-xl" />,
       label: "Dashboard",
       path: "/dashboard",
@@ -69,6 +69,12 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       active: location.pathname === "/chat",
     },
     {
+      icon: <RiMessage3Line className="text-xl" />,
+      label: "Leaderboard",
+      path: "/leaderboard",
+      active: location.pathname === "/leaderboard",
+    },
+    {
       icon: <RiSettings4Line className="text-xl" />,
       label: "Settings",
       path: "/settings",
@@ -85,7 +91,11 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         onClick={() => setIsOpen(!isOpen)}
         className="fixed top-4 left-4 z-[999] p-2 rounded-xl bg-[#1c1b1b]/80 backdrop-blur-sm border border-[#3a3a3a] shadow-lg md:hidden"
       >
-        {isOpen ? <RiCloseLine className="w-6 h-6 text-[#ff9d54]" /> : <RiMenuLine className="w-6 h-6 text-[#ff9d54]" />}
+        {isOpen ? (
+          <RiCloseLine className="w-6 h-6 text-[#ff9d54]" />
+        ) : (
+          <RiMenuLine className="w-6 h-6 text-[#ff9d54]" />
+        )}
       </motion.button>
 
       {/* Backdrop for mobile */}
@@ -111,14 +121,14 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       >
         <div className="flex flex-col h-full">
           {/* Logo Section */}
-          <motion.div 
+          <motion.div
             className="p-6 flex items-center gap-3"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#ff9d54] to-[#ff8a30] flex items-center justify-center">
-              <motion.span 
+              <motion.span
                 className="text-white text-xl font-bold"
                 animate={{ rotate: [0, 360] }}
                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
@@ -148,9 +158,10 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                     if (window.innerWidth < 768) setIsOpen(false);
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all
-                    ${item.active 
-                      ? "bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] text-white shadow-lg" 
-                      : "text-gray-400 hover:bg-[#2a2a2a]"
+                    ${
+                      item.active
+                        ? "bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] text-white shadow-lg"
+                        : "text-gray-400 hover:bg-[#2a2a2a]"
                     }`}
                 >
                   {item.icon}
@@ -175,7 +186,9 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           >
             <div className="p-4 rounded-xl bg-gradient-to-r from-[#2a2a2a] to-[#333333]">
               <p className="text-sm text-[#ff9d54] font-medium">Need Help?</p>
-              <p className="text-xs text-gray-400 mt-1">Check our documentation or contact support</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Check our documentation or contact support
+              </p>
             </div>
           </motion.div>
         </div>
