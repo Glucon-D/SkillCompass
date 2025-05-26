@@ -77,6 +77,7 @@ const QuizStreak = ({ quizScores }) => {
 
   useEffect(() => {
     if (streakDates && streakDates.length > 0) {
+      console.log("Streak Dates:", streakDates);
       calculateStreaks(streakDates);
     }
   }, [streakDates]);
