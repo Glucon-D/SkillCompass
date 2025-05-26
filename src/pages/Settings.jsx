@@ -14,6 +14,7 @@ import { account } from "../config/appwrite";
 import QuizStreak from "./Streak";
 import { getUserProgress } from "../config/database";
 import { format, differenceInDays, parseISO } from "date-fns";
+import { getStreakData } from "../config/database";
 
 const Settings = () => {
   const { user, loading, updateUser } = useAuth();
@@ -24,58 +25,17 @@ const Settings = () => {
     email: user?.email || "",
   });
   const [updateStatus, setUpdateStatus] = useState({ type: "", message: "" });
-  const [quizDates, setQuizDates] = useState(new Set());
-  const [currentStreak, setCurrentStreak] = useState(0);
-  const [longestStreak, setLongestStreak] = useState(0);
+
+  const [streakDates, setStreakDates] = useState(new Set());
 
   useEffect(() => {
-    if (quizScores.length > 0) {
-      // Extract & format quiz dates
-      const dates = quizScores.map((q) =>
-        format(parseISO(q.date), "yyyy-MM-dd")
-      );
-      setQuizDates(new Set(dates));
-
-      // Calculate streaks
-      calculateStreaks(dates);
-    }
-  }, [quizScores]);
-
-  const calculateStreaks = (dates) => {
-    if (dates.length === 0) return;
-
-    // Sort dates & remove duplicates
-    const sortedDates = [...new Set(dates)].sort();
-
-    let tempStreak = 1,
-      maxStreak = 1;
-
-    for (let i = 1; i < sortedDates.length; i++) {
-      const diff = differenceInDays(
-        parseISO(sortedDates[i]),
-        parseISO(sortedDates[i - 1])
-      );
-
-      if (diff === 1) {
-        tempStreak++; // Increase streak if consecutive
-      } else if (diff > 1) {
-        maxStreak = Math.max(maxStreak, tempStreak);
-        tempStreak = 1; // Reset streak if there's a gap
-      }
-    }
-    maxStreak = Math.max(maxStreak, tempStreak);
-
-    // Calculate current streak
-    const today = format(new Date(), "yyyy-MM-dd");
-    const lastQuizDate = sortedDates[sortedDates.length - 1];
-    const daysSinceLastQuiz = differenceInDays(
-      parseISO(today),
-      parseISO(lastQuizDate)
-    );
-
-    setCurrentStreak(daysSinceLastQuiz <= 1 ? tempStreak : 0);
-    setLongestStreak(maxStreak);
-  };
+    const fetchStreak = async () => {
+      const data = await getStreakData(user.$id);
+      console.log("Fetched streak data:", data);
+      setStreakDates(data); // ✅ send array directly
+    };
+    fetchStreak();
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -304,7 +264,7 @@ const Settings = () => {
               <div>
                 <p className="text-sm text-gray-400">Total Streak</p>
                 <p className="text-xl font-bold text-[#ff9d54]">
-                  {currentStreak + longestStreak}
+                  {streakDates.length}
                 </p>
               </div>
             </div>

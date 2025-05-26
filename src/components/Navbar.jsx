@@ -1,97 +1,133 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { databases } from "../config/database";
 import { useAuth } from "../context/AuthContext";
 import { RiFireFill, RiMagicLine } from "react-icons/ri"; // Changed from RiBrainLine to RiMagicLine for the genie theme
 import { format, differenceInDays, parseISO } from "date-fns";
-import { Query } from "appwrite";
+import { getStreakData } from "../config/database";
 
 const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const { user, loading, logout, isAuthenticated } = useAuth();
 
+  // useEffect(() => {
+  //   if (user) fetchUserProgress();
+  // }, [user]);
+
+  const getCurrentStreak = (datesArray) => {
+    if (!Array.isArray(datesArray) || datesArray.length === 0) return 0;
+
+    const today = format(new Date(), "yyyy-MM-dd");
+    const sorted = [...new Set(datesArray)].sort(); // ensure unique + sorted
+
+    let streak = 0;
+
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      const date = parseISO(sorted[i]);
+      const diff = differenceInDays(new Date(today), date);
+
+      if (diff === streak) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  };
+
   const [currentStreak, setCurrentStreak] = useState(0);
 
   useEffect(() => {
-    if (user) fetchUserProgress();
+    const fetchStreak = async () => {
+      try {
+        const streakDates = await getStreakData(user.$id);
+        const streak = getCurrentStreak(streakDates);
+        setCurrentStreak(streak);
+      } catch (err) {
+        console.error("Error fetching streak data:", err);
+        setCurrentStreak(0);
+      }
+    };
+
+    if (user?.$id) fetchStreak();
   }, [user]);
 
-  const fetchUserProgress = async () => {
-    try {
-      // Get quiz data from career-paths collection instead of user_progress
-      const response = await databases.listDocuments(
-        import.meta.env.VITE_APPWRITE_DATABASE_ID,
-        import.meta.env.VITE_CAREER_PATHS_COLLECTION_ID,
-        [Query.equal("userID", user.$id)]
-      );
+  // const fetchUserProgress = async () => {
+  //   try {
+  //     // Get quiz data from career-paths collection instead of user_progress
+  //     const response = await databases.listDocuments(
+  //       import.meta.env.VITE_APPWRITE_DATABASE_ID,
+  //       import.meta.env.VITE_CAREER_PATHS_COLLECTION_ID,
+  //       [Query.equal("userID", user.$id)]
+  //     );
 
-      // Process all career paths to find quiz scores
-      const paths = response.documents || [];
-      let quizScores = [];
+  //     // Process all career paths to find quiz scores
+  //     const paths = response.documents || [];
+  //     let quizScores = [];
 
-      // Check if any assessments data exists in the career paths
-      paths.forEach(path => {
-        // If the path has quizScores, add them to our collection
-        if (path.quizScores) {
-          const pathQuizzes = JSON.parse(path.quizScores);
-          if (Array.isArray(pathQuizzes) && pathQuizzes.length > 0) {
-            quizScores = [...quizScores, ...pathQuizzes];
-          }
-        }
+  //     // Check if any assessments data exists in the career paths
+  //     paths.forEach((path) => {
+  //       // If the path has quizScores, add them to our collection
+  //       if (path.quizScores) {
+  //         const pathQuizzes = JSON.parse(path.quizScores);
+  //         if (Array.isArray(pathQuizzes) && pathQuizzes.length > 0) {
+  //           quizScores = [...quizScores, ...pathQuizzes];
+  //         }
+  //       }
 
-        // If there are assessment dates from completed modules
-        if (path.completedModules) {
-          const completedModules = JSON.parse(path.completedModules || '[]');
-          if (completedModules.length > 0) {
-            // Use completion dates as quiz dates for streak calculation
-            completedModules.forEach((module, index) => {
-              // If module has completion date, use it to calculate streak
-              if (path.updatedAt) {
-                quizScores.push({
-                  topic: `Module ${module + 1}`,
-                  date: path.updatedAt,
-                  score: 100,
-                  accuracy: 100
-                });
-              }
-            });
-          }
-        }
-      });
+  //       // If there are assessment dates from completed modules
+  //       if (path.completedModules) {
+  //         const completedModules = JSON.parse(path.completedModules || "[]");
+  //         if (completedModules.length > 0) {
+  //           // Use completion dates as quiz dates for streak calculation
+  //           completedModules.forEach((module, index) => {
+  //             // If module has completion date, use it to calculate streak
+  //             if (path.updatedAt) {
+  //               quizScores.push({
+  //                 topic: `Module ${module + 1}`,
+  //                 date: path.updatedAt,
+  //                 score: 100,
+  //                 accuracy: 100,
+  //               });
+  //             }
+  //           });
+  //         }
+  //       }
+  //     });
 
-      calculateCurrentStreak(quizScores);
-    } catch (error) {
-      console.error("Error fetching career paths:", error);
-    }
-  };
+  //     calculateCurrentStreak(quizScores);
+  //   } catch (error) {
+  //     console.error("Error fetching career paths:", error);
+  //   }
+  // };
 
-  const calculateCurrentStreak = (quizScores) => {
-    if (!quizScores.length) return;
+  // const calculateCurrentStreak = (quizScores) => {
+  //   if (!quizScores.length) return;
 
-    const dates = quizScores.map((q) => format(parseISO(q.date), "yyyy-MM-dd"));
-    const sortedDates = [...new Set(dates)].sort();
+  //   const dates = quizScores.map((q) => format(parseISO(q.date), "yyyy-MM-dd"));
+  //   const sortedDates = [...new Set(dates)].sort();
 
-    let tempStreak = 1;
-    for (let i = 1; i < sortedDates.length; i++) {
-      const diff = differenceInDays(
-        parseISO(sortedDates[i]),
-        parseISO(sortedDates[i - 1])
-      );
-      if (diff === 1) tempStreak++;
-      else tempStreak = 1;
-    }
+  //   let tempStreak = 1;
+  //   for (let i = 1; i < sortedDates.length; i++) {
+  //     const diff = differenceInDays(
+  //       parseISO(sortedDates[i]),
+  //       parseISO(sortedDates[i - 1])
+  //     );
+  //     if (diff === 1) tempStreak++;
+  //     else tempStreak = 1;
+  //   }
 
-    const today = format(new Date(), "yyyy-MM-dd");
-    const lastQuizDate = sortedDates[sortedDates.length - 1];
-    const daysSinceLastQuiz = differenceInDays(
-      parseISO(today),
-      parseISO(lastQuizDate)
-    );
+  //   const today = format(new Date(), "yyyy-MM-dd");
+  //   const lastQuizDate = sortedDates[sortedDates.length - 1];
+  //   const daysSinceLastQuiz = differenceInDays(
+  //     parseISO(today),
+  //     parseISO(lastQuizDate)
+  //   );
 
-    setCurrentStreak(daysSinceLastQuiz <= 1 ? tempStreak : 0);
-  };
+  //   setCurrentStreak(daysSinceLastQuiz <= 1 ? tempStreak : 0);
+  // };
 
   const handleLogin = () => {
     navigate("/login");
@@ -101,33 +137,33 @@ const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
     navigate("/signup");
   };
 
-  const handleLogout = () => {
-    navigate("/");
-  };
+  // const handleLogout = () => {
+  //   navigate("/");
+  // };
 
-  const getUserDisplay = () => {
-    if (loading) {
-      return (
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#ff9d54]/20 rounded-full animate-pulse" />
-          <div className="w-20 h-4 bg-[#ff9d54]/20 rounded animate-pulse" />
-        </div>
-      );
-    }
+  // const getUserDisplay = () => {
+  //   if (loading) {
+  //     return (
+  //       <div className="flex items-center gap-2">
+  //         <div className="w-8 h-8 bg-[#ff9d54]/20 rounded-full animate-pulse" />
+  //         <div className="w-20 h-4 bg-[#ff9d54]/20 rounded animate-pulse" />
+  //       </div>
+  //     );
+  //   }
 
-    if (!user) return null;
+  //   if (!user) return null;
 
-    return (
-      <>
-        <div className="w-8 h-8 bg-[#ff9d54]/20 rounded-full flex items-center justify-center">
-          {user.$id ? user.$id[0].toUpperCase() : "👤"}
-        </div>
-        <span className="text-white font-medium">
-          {user.name || user.email?.split("@")[0] || user.$id}
-        </span>
-      </>
-    );
-  };
+  //   return (
+  //     <>
+  //       <div className="w-8 h-8 bg-[#ff9d54]/20 rounded-full flex items-center justify-center">
+  //         {user.$id ? user.$id[0].toUpperCase() : "👤"}
+  //       </div>
+  //       <span className="text-white font-medium">
+  //         {user.name || user.email?.split("@")[0] || user.$id}
+  //       </span>
+  //     </>
+  //   );
+  // };
 
   const UserDropdown = () => (
     <AnimatePresence>
@@ -235,8 +271,10 @@ const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
             >
               <RiMagicLine className="text-white text-lg md:text-xl" />
             </motion.div>
-            <span className="text-lg md:text-xl font-serif font-bold bg-gradient-to-r from-[#ff9d54] 
-              to-[#ff8a30] bg-clip-text text-transparent truncate">
+            <span
+              className="text-lg md:text-xl font-serif font-bold bg-gradient-to-r from-[#ff9d54] 
+              to-[#ff8a30] bg-clip-text text-transparent truncate"
+            >
               PathGenie
             </span>
           </motion.div>
@@ -248,7 +286,7 @@ const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
               <RiFireFill className="text-xl md:text-2xl text-[#ff9d54]" />
               {currentStreak}
             </motion.span>
-            
+
             {/* Desktop User Menu */}
             <div className="hidden md:block relative">
               <motion.div
@@ -371,7 +409,9 @@ const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
                         <p className="font-medium text-white">
                           {user?.name || user?.email?.split("@")[0]}
                         </p>
-                        <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+                        <p className="text-xs text-gray-400 truncate">
+                          {user?.email}
+                        </p>
                       </div>
                     </div>
                   </div>

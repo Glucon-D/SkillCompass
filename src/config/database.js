@@ -21,7 +21,7 @@ export const createLearningPath = async (userId, topicName, modules) => {
         quizScores: JSON.stringify([]), // Initialize empty quiz scores array
         flashcardCount: 0, // Initialize flashcard count
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       }
     );
   } catch (error) {
@@ -44,8 +44,8 @@ export const getLearningPaths = async (userId) => {
       documents: response.documents.map((doc) => ({
         ...doc,
         modules: JSON.parse(doc.modules),
-        completedModules: JSON.parse(doc.completedModules || '[]'), // Parse completedModules
-        quizScores: doc.quizScores ? JSON.parse(doc.quizScores) : [] // Parse quizScores if available
+        completedModules: JSON.parse(doc.completedModules || "[]"), // Parse completedModules
+        quizScores: doc.quizScores ? JSON.parse(doc.quizScores) : [], // Parse quizScores if available
       })),
     };
   } catch (error) {
@@ -92,23 +92,23 @@ export const updateUserProgress = async (userId, pathId, data) => {
       import.meta.env.VITE_CAREER_PATHS_COLLECTION_ID,
       pathId
     );
-    
+
     // Parse existing quizScores or initialize empty array
     const quizScores = doc.quizScores ? JSON.parse(doc.quizScores) : [];
-    
+
     // Update document with new quiz score and/or flashcard count
     return await databases.updateDocument(
       import.meta.env.VITE_APPWRITE_DATABASE_ID,
       import.meta.env.VITE_CAREER_PATHS_COLLECTION_ID,
       pathId,
       {
-        quizScores: data.quizScores 
+        quizScores: data.quizScores
           ? JSON.stringify([...quizScores, data.quizScores])
           : doc.quizScores,
         flashcardCount: data.flashcardCount
-          ? (parseInt(doc.flashcardCount || 0) + data.flashcardCount)
+          ? parseInt(doc.flashcardCount || 0) + data.flashcardCount
           : doc.flashcardCount,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       }
     );
   } catch (error) {
@@ -125,10 +125,10 @@ export const getFlashcardCount = async (userId) => {
       import.meta.env.VITE_CAREER_PATHS_COLLECTION_ID,
       [Query.equal("userID", userId)]
     );
-    
+
     // Sum up flashcard counts from all career paths
     return response.documents.reduce((total, doc) => {
-      return total + (parseInt(doc.flashcardCount || 0));
+      return total + parseInt(doc.flashcardCount || 0);
     }, 0);
   } catch (error) {
     console.error("Error fetching flashcard count:", error);
@@ -144,12 +144,12 @@ export const getUserProgress = async (userId) => {
       import.meta.env.VITE_CAREER_PATHS_COLLECTION_ID,
       [Query.equal("userID", userId)]
     );
-    
+
     // Combine quiz scores from all paths
     let allQuizScores = [];
     let totalFlashcardCount = 0;
-    
-    response.documents.forEach(doc => {
+
+    response.documents.forEach((doc) => {
       // Add quiz scores from this path
       if (doc.quizScores) {
         const pathQuizScores = JSON.parse(doc.quizScores);
@@ -157,21 +157,23 @@ export const getUserProgress = async (userId) => {
           allQuizScores = [...allQuizScores, ...pathQuizScores];
         }
       }
-      
+
       // Add flashcard count
       totalFlashcardCount += parseInt(doc.flashcardCount || 0);
     });
-    
+
     return {
       flashcardCount: totalFlashcardCount,
       quizScores: allQuizScores,
-      paths: response.documents.map(doc => ({
+      paths: response.documents.map((doc) => ({
         id: doc.$id,
         name: doc.topicName,
         progress: doc.progress,
-        completedModules: doc.completedModules ? JSON.parse(doc.completedModules) : [],
-        updatedAt: doc.updatedAt
-      }))
+        completedModules: doc.completedModules
+          ? JSON.parse(doc.completedModules)
+          : [],
+        updatedAt: doc.updatedAt,
+      })),
     };
   } catch (error) {
     console.error("Error fetching user progress:", error);
@@ -187,12 +189,20 @@ export const markModuleComplete = async (pathId, moduleIndex) => {
       pathId
     );
 
-    const completedModules = JSON.parse(doc.completedModules || '[]');
+    const completedModules = JSON.parse(doc.completedModules || "[]");
+    const timestamps = doc.timestamp || []; // This is already an array from Appwrite
+
     if (!completedModules.includes(moduleIndex.toString())) {
       completedModules.push(moduleIndex.toString());
+
+      // Push the current timestamp in ISO format
+      const currentTimestamp = new Date().toISOString();
+      timestamps.push(currentTimestamp);
     }
 
-    const progress = Math.round((completedModules.length / JSON.parse(doc.modules).length) * 100);
+    const progress = Math.round(
+      (completedModules.length / JSON.parse(doc.modules).length) * 100
+    );
 
     const updated = await databases.updateDocument(
       import.meta.env.VITE_APPWRITE_DATABASE_ID,
@@ -201,6 +211,7 @@ export const markModuleComplete = async (pathId, moduleIndex) => {
       {
         completedModules: JSON.stringify(completedModules),
         progress,
+        timestamp: timestamps,
       }
     );
 
@@ -211,8 +222,15 @@ export const markModuleComplete = async (pathId, moduleIndex) => {
   }
 };
 
-
-export const saveQuizScore = async ({ userID, pathID, moduleID, moduleName, score, feedback, timestamp }) => {
+export const saveQuizScore = async ({
+  userID,
+  pathID,
+  moduleID,
+  moduleName,
+  score,
+  feedback,
+  timestamp,
+}) => {
   try {
     const res = await databases.createDocument(
       import.meta.env.VITE_APPWRITE_DATABASE_ID,
@@ -225,11 +243,8 @@ export const saveQuizScore = async ({ userID, pathID, moduleID, moduleName, scor
         moduleName, // ✅ added module title
         score,
         feedback,
-        timestamp
+        timestamp,
       }
-
-      
-
     );
     console.log("✅ Score saved in assessments:", res);
     return res;
@@ -238,8 +253,6 @@ export const saveQuizScore = async ({ userID, pathID, moduleID, moduleName, scor
     throw err;
   }
 };
-
-
 
 export const getQuizScores = async ({
   userId = null,
@@ -262,6 +275,54 @@ export const getQuizScores = async ({
     return res.documents;
   } catch (error) {
     console.error("❌ Error fetching quiz scores:", error);
+    return [];
+  }
+};
+
+export const getStreakData = async (userID) => {
+  const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
+  const CAREER_PATHS_COLLECTION_ID = import.meta.env
+    .VITE_CAREER_PATHS_COLLECTION_ID;
+  const ASSESSMENTS_COLLECTION_ID = import.meta.env
+    .VITE_ASSESSMENTS_COLLECTION_ID;
+  try {
+    const allDates = new Set();
+
+    // 1️⃣ Get all completed module timestamps from career-paths
+    const careerPathsRes = await databases.listDocuments(
+      DATABASE_ID,
+      CAREER_PATHS_COLLECTION_ID,
+      [Query.equal("userID", userID)]
+    );
+
+    careerPathsRes.documents.forEach((doc) => {
+      (doc.timestamp || []).forEach((isoString) => {
+        const dateOnly = isoString.split("T")[0]; // "2025-05-26"
+        allDates.add(dateOnly);
+      });
+    });
+
+    // 2️⃣ Get all quiz timestamps from assessments
+    const assessmentsRes = await databases.listDocuments(
+      DATABASE_ID,
+      ASSESSMENTS_COLLECTION_ID,
+      [Query.equal("userID", userID)]
+    );
+
+    assessmentsRes.documents.forEach((doc) => {
+      const iso = doc.timestamp;
+      if (iso) {
+        const dateOnly = new Date(iso).toISOString().split("T")[0];
+        allDates.add(dateOnly);
+      }
+    });
+
+    // 3️⃣ Convert set to array and sort (optional)
+    const streakDates = Array.from(allDates).sort();
+
+    return streakDates; // ["2025-05-25", "2025-05-26", ...]
+  } catch (error) {
+    console.error("❌ Failed to fetch streak data:", error);
     return [];
   }
 };

@@ -7,7 +7,12 @@
 }
 
 .bg-gradient-radial {
-  background-image: radial-gradient(circle at center, var(--tw-gradient-from) 0%, var(--tw-gradient-via) 50%, var(--tw-gradient-to) 100%);
+  background-image: radial-gradient(
+    circle at center,
+    var(--tw-gradient-from) 0%,
+    var(--tw-gradient-via) 50%,
+    var(--tw-gradient-to) 100%
+  );
 }
 
 /* Add smooth transitions */
@@ -26,7 +31,6 @@
   }
 }
 
-
 /* CareerSummary.css */
 
 .summary-container {
@@ -36,7 +40,7 @@
   border-radius: 12px;
   font-size: 16px;
   line-height: 1.75;
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   max-width: 100%;
   overflow-wrap: break-word;
 }
@@ -81,4 +85,9 @@
   .pie-wrapper {
     width: 100%;
   }
+}
+
+.custom-calendar .react-calendar__tile.quiz-date {
+  position: relative;
+  box-shadow: 0 0 10px #ff6b00;
 }
