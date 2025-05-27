@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { sendPasswordRecovery } from '../config/appwrite';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, isAuthenticated, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -17,14 +17,13 @@ const Login = () => {
   const [resetEmail, setResetEmail] = useState('');
   const [resetStatus, setResetStatus] = useState('');
 
+  // If already authenticated, redirect to dashboard
   useEffect(() => {
-    const checkAndRedirect = async () => {
-      if (localStorage.getItem('userSession')) {
-        navigate('/dashboard');
-      }
-    };
-    checkAndRedirect();
-  }, [navigate]);
+    if (isAuthenticated) {
+      console.log("User already authenticated, redirecting to dashboard");
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,10 +31,21 @@ const Login = () => {
     setLoading(true);
 
     try {
+      console.log("Login form submitted:", formData.email);
       await login(formData.email, formData.password);
-      window.location.href = '/dashboard';  // Use full page redirect
+      console.log("Login component received successful login response");
+      
+      // Force redirect in case navigation from auth context didn't work
+      setTimeout(() => {
+        if (window.location.pathname !== '/dashboard') {
+          console.log("Forcing dashboard navigation from Login component");
+          navigate('/dashboard', { replace: true });
+        }
+      }, 500);
     } catch (err) {
+      console.error("Login error in component:", err);
       setError(err.message || 'Login failed. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
@@ -56,6 +66,11 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  // If already authenticated, don't render login page
+  if (isAuthenticated && !loading) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#1c1b1b]">
