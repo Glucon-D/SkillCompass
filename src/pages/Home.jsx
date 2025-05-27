@@ -1,61 +1,54 @@
-import { useNavigate } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
-import {
-  RiArrowRightLine,
-  RiPlayCircleLine,
-  RiBrainLine,
-  RiLightbulbLine,
-  RiBarChartBoxLine,
-} from "react-icons/ri";
+import { FaRocket, FaBookOpen } from "react-icons/fa";
 import { useState, useEffect, useRef } from "react";
-import { useInView } from "framer-motion";
-import IllustrationImage from "../assets/Illustration.jpg";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { AnimatePresence, motion } from "framer-motion";
+import AiImage from "../assets/AiPhoto.png";
+import ProgressImage from "../assets/ProgressImage.png"
+import PracticeImage from "../assets/PracticeImage.png"
 
-const AnimatedCounter = ({ target, duration = 4000 }) => {
-  const [count, setCount] = useState(0);
-  const ref = useRef(null);
 
-  const isInView = useInView(ref, { once: true });
-
-  useEffect(() => {
-    if (!isInView) return;
-
-    let start = 0;
-    const isPlus = target.includes("+");
-    const isPercent = target.includes("%");
-    const hasK = target.includes("K");
-
-    const rawNumber = parseInt(target.replace(/\D/g, ""), 10);
-    const end = hasK ? rawNumber * 1000 : rawNumber;
-
-    const totalSteps = Math.floor(duration / 40);
-    const step = Math.max(1, Math.floor(end / totalSteps));
-
-    const timer = setInterval(() => {
-      start += step;
-      if (start >= end) {
-        setCount(end);
-        clearInterval(timer);
-      } else {
-        setCount(start);
-      }
-    }, 40);
-
-    return () => clearInterval(timer);
-  }, [isInView, target, duration]);
-
-  const display = target.includes("K")
-    ? `${Math.floor(count / 1000)}K+`
-    : target.includes("+")
-    ? `${count}+`
-    : target.includes("%")
-    ? `${count}%`
-    : count;
-
-  return <span ref={ref}>{display}</span>;
-};
-
+const testimonials = [
+  {
+    name: "Aarav Mehta",
+    role: "Software Engineer",
+    avatar: "https://i.pravatar.cc/100?img=12",
+    quote:
+      "This platform made me fall in love with learning again. Super intuitive and powerful.",
+  },
+  {
+    name: "Ishita Roy",
+    role: "Data Analyst",
+    avatar: "https://i.pravatar.cc/100?img=32",
+    quote:
+      "The real-time feedback is a game-changer. It felt like I had a personal coach guiding me.",
+  },
+  {
+    name: "Kunal Kapoor",
+    role: "Frontend Developer",
+    avatar: "https://i.pravatar.cc/100?img=22",
+    quote:
+      "Every module is crafted with such clarity. The AI guidance really works!",
+  },
+];
+const faqs = [
+  {
+    q: "How does the AI personalize my learning?",
+    a: "Our AI analyzes your performance, preferences, and goals to adaptively recommend modules, track your growth, and optimize your learning path.",
+  },
+  {
+    q: "Is PathGenie suitable for complete beginners?",
+    a: "Absolutely! Whether you're a beginner or an advanced learner, PathGenie adjusts difficulty and content to match your level.",
+  },
+  {
+    q: "Can I learn at my own pace?",
+    a: "Yes! PathGenie is fully self-paced. You can pause, resume, or skip modules anytime you like.",
+  },
+  {
+    q: "What kind of content is available?",
+    a: "Interactive modules, flashcards, quizzes, and real-world projects — all backed by AI for maximum impact.",
+  },
+];
 const FaqItem = ({ question, answer }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -91,84 +84,8 @@ const FaqItem = ({ question, answer }) => {
   );
 };
 
-const features = [
-  {
-    icon: <RiBrainLine className="text-3xl text-white" />,
-    title: "AI-Powered Learning",
-    description: "Personalized learning paths tailored to your needs.",
-    iconBg: "bg-[#ff9d54]",
-    cardBg: "bg-[#2a2a2a]",
-    borderColor: "border-[#ff9d54]",
-  },
-  {
-    icon: <RiLightbulbLine className="text-3xl text-white" />,
-    title: "Smart Progress",
-    description: "Track your growth with intelligent insights.",
-    iconBg: "bg-[#ff9d54]",
-    cardBg: "bg-[#2a2a2a]",
-    borderColor: "border-[#ff9d54]",
-  },
-  {
-    icon: <RiBarChartBoxLine className="text-3xl text-white" />,
-    title: "Interactive Practice",
-    description: "Hands-on modules with real-time feedback.",
-    iconBg: "bg-[#ff9d54]",
-    cardBg: "bg-[#2a2a2a]",
-    borderColor: "border-[#ff9d54]",
-  },
-];
-
-const stats = [
-  { number: "10K+", label: "Active Learners" },
-  { number: "50+", label: "Learning Paths" },
-  { number: "95%", label: "Success Rate" },
-  { number: "24/7", label: "AI Assistance" },
-];
-
-const testimonials = [
-  {
-    name: "Sarah Johnson",
-    role: "Frontend Dev",
-    avatar: "https://randomuser.me/api/portraits/women/1.jpg",
-    quote:
-      "PathGenie completely transformed how I learn. The AI recommendations are spot-on!",
-  },
-  {
-    name: "Mike Chen",
-    role: "Engineering Student",
-    avatar: "https://randomuser.me/api/portraits/men/2.jpg",
-    quote:
-      "I love the interactive paths and quizzes — they keep me engaged and motivated.",
-  },
-  {
-    name: "Emily Davis",
-    role: "Data Analyst",
-    avatar: "https://randomuser.me/api/portraits/women/3.jpg",
-    quote:
-      "The smart progress tracking helped me identify and fix my weak spots easily.",
-  },
-];
-
-const faqs = [
-  {
-    q: "How does the AI personalize my learning?",
-    a: "Our AI analyzes your performance, preferences, and goals to adaptively recommend modules, track your growth, and optimize your learning path.",
-  },
-  {
-    q: "Is PathGenie suitable for complete beginners?",
-    a: "Absolutely! Whether you're a beginner or an advanced learner, PathGenie adjusts difficulty and content to match your level.",
-  },
-  {
-    q: "Can I learn at my own pace?",
-    a: "Yes! PathGenie is fully self-paced. You can pause, resume, or skip modules anytime you like.",
-  },
-  {
-    q: "What kind of content is available?",
-    a: "Interactive modules, flashcards, quizzes, and real-world projects — all backed by AI for maximum impact.",
-  },
-];
-
-const Home = () => {
+export default function Home() {
+  const [particles, setParticles] = useState([]);
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -200,164 +117,136 @@ const Home = () => {
     },
   };
 
+  useEffect(() => {
+    const temp = Array.from({ length: 110 }, () => ({
+      top: `${Math.random() * 100}%`,
+      left: `${Math.random() * 100}%`,
+      delay: Math.random() * 5,
+      duration: 4 + Math.random() * 4,
+    }));
+    setParticles(temp);
+  }, []);
+
   return (
-    <div className="w-full bg-[#1c1b1b] text-white">
-      {/* Enhanced Hero Section */}
-      <section className="relative w-full bg-gradient-to-br from-[#2a2a2a] via-[#1c1b1b] to-[#1c1b1b] overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
+    <>
+      {/* HERO SECTION */}
+      <section className="relative overflow-hidden bg-[#1c1b1b] pb-24 rounded-b-[100px]">
+        {/* Glow Layer */}
+        <div className="absolute top-48 left-1/2 transform -translate-x-1/2 w-[1000px] h-[800px] bg-[#fa8226dc] opacity-30 blur-[150px] rounded-full pointer-events-none" />
 
-        <div className="relative max-w-7xl mx-auto px-4 py-12 md:py-20 lg:py-28">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-gradient-radial from-[#ff9d54]/20 via-transparent to-transparent opacity-50"></div>
+        {/* SVG Floating Particles */}
+        {particles.map((p, i) => (
+          <motion.span
+            key={i}
+            className="absolute w-[3px] h-[3px] rounded-full bg-[#ff9d54] shadow-[0_0_6px_var(--tw-shadow-color)] shadow-accent z-0 opacity-70"
+            style={{ top: p.top, left: p.left }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ y: -20, opacity: [0, 0.8, 0] }}
+            transition={{
+              repeat: Infinity,
+              duration: p.duration,
+              delay: p.delay,
+              ease: "easeInOut",
+            }}
+          />
+        ))}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative">
-            <div className="text-center lg:text-left order-2 lg:order-1 z-10">
-              <motion.div
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-                className="space-y-8"
-              >
-                <motion.div variants={itemVariants}>
-                  <span className="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-medium bg-gradient-to-r from-[#2a2a2a] to-[#333333] text-[#ff9d54] border border-[#ff9d54]/30 shadow-sm">
-                    <span className="mr-2">✨</span> Powered by Advanced AI
-                  </span>
-                </motion.div>
-
-                <motion.h1
-                  variants={itemVariants}
-                  className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight"
-                >
-                  <span className="block font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#ff9d54] via-[#ffb77e] to-[#ff9d54] animate-gradient-x">
-                    Master Skills
-                  </span>
-                  <span className="block mt-2 text-white">
-                    With AI Guidance
-                  </span>
-                </motion.h1>
-
-                <motion.p
-                  variants={itemVariants}
-                  className="max-w-2xl mx-auto lg:mx-0 text-base sm:text-lg lg:text-xl text-gray-300"
-                >
-                  Experience the future of learning with personalized AI
-                  content, real-time feedback, and hands-on practice.
-                </motion.p>
-
-                <motion.div
-                  variants={itemVariants}
-                  className="flex flex-col sm:flex-row justify-center lg:justify-start gap-4"
-                >
-                  <button
-                    onClick={handleStartLearning}
-                    className="group px-8 py-4 bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] text-white rounded-xl 
-                    shadow-xl shadow-[#ff9d54]/20 hover:shadow-2xl hover:shadow-[#ff9d54]/30 
-                    transform hover:-translate-y-1 transition-all duration-300 hover:scale-105
-                    border border-white/10 backdrop-blur-sm flex items-center justify-center gap-2"
-                  >
-                    Start Learning Free
-                    <RiArrowRightLine className="group-hover:translate-x-1 transition-transform" />
-                  </button>
-                  <button
-                    className="px-8 py-4 bg-[#2a2a2a]/80 backdrop-blur-sm border border-[#3a3a3a] text-white 
-                    font-medium rounded-xl hover:bg-[#1f1f1f] hover:border-[#ff9d54] transform hover:-translate-y-1 
-                    transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-lg flex items-center justify-center gap-2 hover:shadow-[#080808]"
-                  >
-                    See How It Works
-                    <RiPlayCircleLine className="text-[#ff9d54] text-xl group-hover:scale-110 transition-transform" />
-                  </button>
-                </motion.div>
-              </motion.div>
-            </div>
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="order-1 lg:order-2 relative"
-            >
-              <div className="relative z-10 rounded-3xl overflow-hidden hover:shadow-2xl shadow-[#080808] border border-[#3a3a3a] hover:scale-105 duration-500">
-                <div className="absolute inset-0 bg-[#1c1b1b] z-0"></div>
-                <img
-                  className="w-full h-auto transform  transition-transform duration-700 relative z-10"
-                  src={IllustrationImage}
-                  alt="AI Learning Illustration"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-[#1c1b1b]/50 to-[#1c1b1b]/30 z-20"></div>
-              </div>
-
-              {/* Decorative elements */}
-              <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#ff9d54]/20 rounded-full blur-3xl"></div>
-              <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-[#ff9d54]/20 rounded-full blur-3xl"></div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* Enhanced Features Section */}
-      <section className="relative w-full bg-gradient-to-b from-[#1c1b1b] to-[#252525] py-20 md:py-32">
-        <div className="max-w-6xl mx-auto px-4">
+        {/* Content */}
+        <div className="relative z-10 flex flex-col items-center justify-center text-center px-6 pt-32 max-w-3xl h-[560px] mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mb-6 px-4 py-1 text-sm text-white border border-[#ff9d54] rounded-full bg-[#ff9d54]/10"
           >
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#ff9d54] to-[#ffb77e]">
-              Why Choose Our Platform?
-            </h2>
+            <span className="text-[#ff9d54]">⚡ Powered by Advanced AI</span>
           </motion.div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 lg:gap-10">
-            {features.map((feature, index) => (
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-white leading-tight"
+          >
+            <span className="text-[#ff9d54]">Master Skills</span> With AI
+            Guidance
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="mt-4 text-lg text-gray-300 max-w-xl"
+          >
+            Experience the future of learning with personalized AI content,
+            real-time feedback, and hands-on practice.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="mt-8 flex flex-col sm:flex-row gap-4"
+          >
+            <button className="bg-[#f7ad74] text-black px-6 py-3 rounded-full font-semibold hover:bg-opacity-90 flex items-center gap-2 shadow-xl shadow-[#ff9d54]/20 hover:shadow-2xl hover:shadow-[#ff9d54]/30 
+                    transform hover:-translate-y-1 transition-all duration-300 hover:scale-105 hover:bg-[#ff9d54]">
+              <FaRocket />
+              Start Learning Free
+            </button>
+            <button className="bg-white/10 border border-white/20 text-white px-6 py-3 rounded-full font-semibold flex items-center gap-2 hover:bg-[#1f1f1f] hover:border-[#ff9d54] transform hover:-translate-y-1 
+                    transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-lg hover:shadow-[#080808]">
+              <FaBookOpen />
+              See How It Works
+            </button>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* FEATURES SECTION (Alternating Layout + Spotlight + Tilt) */}
+      <section className="bg-[#1c1b1b] py-24 px-6 text-white">
+        <h2 className="text-3xl sm:text-4xl font-bold text-center mb-16">
+          Why Choose Our Platform?
+        </h2>
+
+        <div className="flex flex-col gap-12 max-w-6xl mx-auto">
+          {[
+            {
+              title: "AI-Powered Learning",
+              desc: "Personalized learning paths tailored to your needs.",
+              img: AiImage,
+            },
+            {
+              title: "Smart Progress",
+              desc: "Track your growth with intelligent insights.",
+              img: ProgressImage,
+            },
+            {
+              title: "Interactive Practice",
+              desc: "Hands-on modules with real-time feedback.",
+              img: PracticeImage,
+            },
+          ].map((item, index) => {
+            const isReversed = index % 2 !== 0;
+            return (
               <motion.div
                 key={index}
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 40 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.2 }}
-                className={`rounded-2xl p-6 md:p-8 transition-all hover:shadow-xl shadow-[#ff9e5492] hover:scale-105 shadow-md border ${feature.cardBg} border-[#ff9d54] hover:bg-gradient-to-r from-[#ff9e5446] to-[#ff9e5446] duration-300`}
+                transition={{ duration: 0.6, delay: index * 0.2 }}
+                viewport={{ once: true, amount: 0.2 }}
               >
-                <div
-                  className={`w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-xl mx-auto mb-5 md:mb-6 ${feature.iconBg}`}
-                >
-                  {feature.icon}
-                </div>
-                <h3 className="text-lg md:text-xl font-semibold text-white mb-2">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-300 text-sm md:text-base">
-                  {feature.description}
-                </p>
+                <FeatureRow
+                  title={item.title}
+                  desc={item.desc}
+                  img={item.img}
+                  reversed={isReversed}
+                />
               </motion.div>
-            ))}
-          </div>
+            );
+          })}
+
         </div>
       </section>
-
-      {/* STATS SECTION */}
-      <section className="bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] text-white py-14 md:py-16 lg:py-20 px-4">
-        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 text-center">
-          {stats.map((stat, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.15 }}
-              className="p-3"
-            >
-              <div className="text-3xl md:text-4xl font-bold">
-                <AnimatedCounter target={stat.number} />
-              </div>
-              <div className="text-white/80 text-xs md:text-sm mt-1">
-                {stat.label}
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
       {/* TESTIMONIALS SECTION */}
       <section className="bg-[#252525] py-16 md:py-20 lg:py-24 px-4">
         <div className="max-w-6xl mx-auto text-center">
@@ -441,45 +330,104 @@ const Home = () => {
           </motion.button>
         </div>
       </section>
-
-      <style jsx>{`
-        .animate-gradient-x {
-          background-size: 200% 200%;
-          animation: gradient-x 15s ease infinite;
-        }
-
-        @keyframes gradient-x {
-          0% {
-            background-position: 0% 50%;
-          }
-          50% {
-            background-position: 100% 50%;
-          }
-          100% {
-            background-position: 0% 50%;
-          }
-        }
-
-        .bg-grid-pattern {
-          background-image: linear-gradient(
-              to right,
-              #ff9d54 1px,
-              transparent 1px
-            ),
-            linear-gradient(to bottom, #ff9d54 1px, transparent 1px);
-          background-size: 40px 40px;
-        }
-
-        .bg-gradient-radial {
-          background-image: radial-gradient(
-            circle at center,
-            var(--tw-gradient-from) 0%,
-            var(--tw-gradient-to) 100%
-          );
-        }
-      `}</style>
-    </div>
+    </>
   );
-};
+}
 
-export default Home;
+// FeatureCard is inline, not extracted
+function FeatureRow({ title, desc, img, reversed }) {
+  const ref = useRef(null);
+  const [coords, setCoords] = useState({ x: "50%", y: "50%" });
+  const [hovering, setHovering] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = (e) => {
+    const rect = ref.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    setCoords({ x, y });
+
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateX = ((y - centerY) / centerY) * -10;
+    const rotateY = ((x - centerX) / centerX) * 10;
+
+    setTilt({ x: rotateX, y: rotateY });
+  };
+
+  useEffect(() => {
+    if (hovering) {
+      setVisible(true);
+    } else {
+      const timeout = setTimeout(() => setVisible(false), 300);
+      return () => clearTimeout(timeout);
+    }
+  }, [hovering]);
+
+  return (
+    <div
+      ref={ref}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => {
+        setHovering(false);
+        setTilt({ x: 0, y: 0 });
+      }}
+      onMouseMove={handleMouseMove}
+      className={`relative flex flex-col md:flex-row ${reversed ? "md:flex-row-reverse" : ""
+        } items-center justify-between gap-10 bg-[#252422] p-8 rounded-3xl border border-[#ff9e54b4] transition duration-300 will-change-transform`}
+      style={{
+        transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+        transition: hovering ? "transform 0.1s ease" : "transform 0.4s ease",
+      }}
+    >
+      {/* Glow BG */}
+      {visible && (
+        <div
+          className={`pointer-events-none absolute inset-0 transition-opacity duration-300 ${hovering ? "opacity-100" : "opacity-0"
+            }`}
+          style={{
+            background: `radial-gradient(300px circle at ${coords.x}px ${coords.y}px, #ff9d5433, transparent 80%)`,
+          }}
+        />
+      )}
+
+      {/* Glow Border Mask */}
+      {visible && (
+        <div
+          className={`absolute inset-0 pointer-events-none rounded-3xl z-0 transition-opacity duration-300 ${hovering ? "opacity-100" : "opacity-0"
+            }`}
+          style={{
+            WebkitMaskImage: `radial-gradient(250px at ${coords.x}px ${coords.y}px, white, transparent)`,
+            maskImage: `radial-gradient(250px at ${coords.x}px ${coords.y}px, white, transparent)`,
+            boxShadow: `0 0 80px #ff9d5422`,
+          }}
+        />
+      )}
+
+      {/* Content */}
+      <div className="relative z-10 flex-1">
+        <h3 className="text-2xl font-semibold mb-2">{title}</h3>
+        <p className="text-gray-400 text-base max-w-md">{desc}</p>
+      </div>
+
+      {/* Illustration Placeholder */}
+      <div className="relative z-10 flex-1 w-full h-40 md:h-60 overflow-hidden rounded-2xl">
+        <img
+          src={img}
+          alt={title}
+          className="w-full h-full object-contain "
+        />
+      </div>
+
+
+    </div>
+
+
+
+  );
+}
+
+
+
