@@ -21,6 +21,9 @@ import { generateQuiz } from "../config/llm";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import PointToast from "../components/PointToast";
+import { usePoints } from "../context/PointsContext";
+import { set } from "date-fns";
+import { useStreak } from "../context/StreakContext";
 
 // Add cache management at the top
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
@@ -74,15 +77,13 @@ const LearningPathDetails = () => {
   const [completedModules, setCompletedModules] = useState([]);
   const [selectedModuleIndex, setSelectedModuleIndex] = useState(null);
   const [quizData, setQuizData] = useState(null);
-  const [loadingQuiz, setLoadingQuiz] = useState(false);
-  const [youtubeContent, setYoutubeContent] = useState([]);
   const [loadingYoutube, setLoadingYoutube] = useState(false);
   const [youtubeVideos, setYoutubeVideos] = useState([]);
-  const [youtubePlaylists, setYoutubePlaylists] = useState([]);
   const { user } = useAuth();
   const [showToast, setShowToast] = useState(false);
   const [pointsEarned, setPointsEarned] = useState(0);
-
+  const { setPoints } = usePoints();
+  const { refreshStreak } = useStreak();
   const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
   const CAREER_PATHS_COLLECTION_ID = import.meta.env
     .VITE_CAREER_PATHS_COLLECTION_ID;
@@ -194,9 +195,10 @@ const LearningPathDetails = () => {
         const currentTime = new Date().toISOString();
         updatedTimestamps.push(currentTime);
 
-        pointsEarned = 5; // 🎯 5 points for module completion
-        setPointsEarned(pointsEarned); // ✅ Set points to toast
-        setShowToast(true); // ✅ Trigger toast popup
+        pointsEarned = 5; // ✅ Now properly assigned
+        setPoints((prev) => prev + pointsEarned); // ✅ Live update context
+        setPointsEarned(pointsEarned); // ✅ Show in toast
+        setShowToast(true); // ✅ Trigger toast
       }
 
       const newProgress = Math.round(
@@ -222,6 +224,9 @@ const LearningPathDetails = () => {
         progress: newProgress,
         timestamp: updatedTimestamps,
       });
+
+      //Update user streak
+      refreshStreak();
 
       toast.success("Module marked as complete!");
 

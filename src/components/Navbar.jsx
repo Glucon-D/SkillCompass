@@ -2,75 +2,19 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import {
-  RiFireFill,
-  RiMagicLine,
-  RiCoinFill,
-  RiTrophyFill,
-} from "react-icons/ri"; // Added RiCoinFill for points
-import { differenceInDays, parseISO, format } from "date-fns";
-import { getStreakData } from "../config/database";
-import { getPoints } from "../config/database";
+
+import { RiFireFill, RiCompassDiscoverFill, RiCoinFill } from "react-icons/ri"; // Changed RiMagicLine to RiCompassDiscoverFill
+
+import { usePoints } from "../context/PointsContext";
+import { useStreak } from "../context/StreakContext";
 
 const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const { user, loading, logout, isAuthenticated } = useAuth();
-  const [points, setPoints] = useState(0);
-  const [currentStreak, setCurrentStreak] = useState(0);
 
-  // ✅ Function to calculate current streak
-  const calculateCurrentStreak = (dates) => {
-    if (!Array.isArray(dates) || dates.length === 0) return 0;
-
-    const today = format(new Date(), "yyyy-MM-dd"); // normalize to date only
-    const todayDate = parseISO(today);
-
-    const sorted = [...new Set(dates)].sort();
-
-    let streak = 0;
-
-    for (let i = sorted.length - 1; i >= 0; i--) {
-      const date = parseISO(sorted[i]);
-      const diff = differenceInDays(todayDate, date);
-
-      if (diff === streak) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-
-    return streak;
-  };
-
-  // ✅ Load user points
-  useEffect(() => {
-    if (!loading && user?.$id) {
-      const fetchPoints = async () => {
-        const currentPoints = await getPoints(user.$id);
-        setPoints(currentPoints);
-      };
-      fetchPoints();
-    }
-  }, [user, loading]);
-
-  // ✅ Load user streak
-  useEffect(() => {
-    if (!loading && user?.$id) {
-      const fetchStreak = async () => {
-        try {
-          const streakDates = await getStreakData(user.$id);
-          const streak = calculateCurrentStreak(streakDates);
-          setCurrentStreak(streak);
-        } catch (err) {
-          console.error("Error fetching streak data:", err);
-          setCurrentStreak(0);
-        }
-      };
-      fetchStreak();
-    }
-  }, [user, loading]);
+  const { points } = usePoints();
+  const { currentStreak } = useStreak();
 
   const handleLogin = () => navigate("/login");
   const handleSignup = () => navigate("/signup");
@@ -171,7 +115,7 @@ const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className="flex items-center gap-1.5 md:gap-2 cursor-pointer"
-            onClick={() => navigate("/")}
+            onClick={() => navigate(isAuthenticated ? "/dashboard" : "/")}
           >
             <motion.div
               animate={{ rotate: [0, 10, -10, 0] }}
@@ -179,13 +123,13 @@ const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
               className="w-7 h-7 md:w-8 md:h-8 bg-gradient-to-tr from-[#ff9d54] to-[#ff8a30] rounded-lg 
                 flex items-center justify-center"
             >
-              <RiMagicLine className="text-white text-lg md:text-xl" />
+              <RiCompassDiscoverFill className="text-white text-lg md:text-xl" />
             </motion.div>
             <span
               className="text-lg md:text-xl font-serif font-bold bg-gradient-to-r from-[#ff9d54] 
               to-[#ff8a30] bg-clip-text text-transparent truncate"
             >
-              PathGenie
+              SkillCompass
             </span>
           </motion.div>
         </div>

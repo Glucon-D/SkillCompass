@@ -8,6 +8,40 @@ import { Query } from "appwrite";
 import { toast } from "react-hot-toast";
 import { generateAINudges } from "../config/llm";
 import NudgeCard from "../components/NudgeCard";
+import { useStreak } from "../context/StreakContext";
+
+const getAverageAccuracy = async (userId) => {
+  const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
+  const ASSESSMENTS_COLLECTION_ID = import.meta.env
+    .VITE_ASSESSMENTS_COLLECTION_ID;
+
+  try {
+    const res = await databases.listDocuments(
+      DATABASE_ID,
+      ASSESSMENTS_COLLECTION_ID,
+      [Query.equal("userID", userId)]
+    );
+
+    const assessments = res.documents || [];
+
+    const accuracies = assessments
+      .map((doc) => {
+        const match = doc.feedback?.match(/Accuracy:\s*([\d.]+)%/);
+        return match ? parseFloat(match[1]) : null;
+      })
+      .filter((a) => a !== null);
+
+    if (accuracies.length === 0) return 0;
+
+    const total = accuracies.reduce((sum, acc) => sum + acc, 0);
+    const average = total / accuracies.length;
+
+    return Number(average.toFixed(2));
+  } catch (error) {
+    console.error("❌ Failed to get average accuracy:", error);
+    return 0;
+  }
+};
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -15,21 +49,22 @@ const Dashboard = () => {
   const [paths, setPaths] = useState([]);
   const [flashcardCount, setFlashcardCount] = useState(0);
   const [quizScores, setQuizScores] = useState([]);
-  const [currentStreak, setCurrentStreak] = useState(0);
+  const { currentStreak } = useStreak();
   const [isLoading, setIsLoading] = useState(true);
   const [recentActivity, setRecentActivity] = useState([]);
   const [userStats, setUserStats] = useState({
     completedPaths: 0,
     totalModulesCompleted: 0,
-    avgQuizScore: 0
+    avgQuizScore: 0,
   });
   const [aiNudges, setAiNudges] = useState([]);
+  const [averageAccuracy, setAverageAccuracy] = useState(null);
 
   // Get environment variables for Appwrite database and collections
   const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
   const CAREER_COLLECTION_ID = import.meta.env.VITE_CAREER_PATHS_COLLECTION_ID;
-  const ASSESSMENTS_COLLECTION_ID = import.meta.env.VITE_ASSESSMENTS_COLLECTION_ID;
-  const USER_PROGRESS_COLLECTION_ID = import.meta.env.VITE_USER_PROGRESS_COLLECTION_ID;
+  const ASSESSMENTS_COLLECTION_ID = import.meta.env
+    .VITE_ASSESSMENTS_COLLECTION_ID;
 
   useEffect(() => {
     const fetchAllUserData = async () => {
@@ -38,7 +73,7 @@ const Dashboard = () => {
         await Promise.all([
           fetchUserProgress(),
           fetchPaths(),
-          fetchRecentActivity()
+          fetchRecentActivity(),
         ]);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -50,6 +85,23 @@ const Dashboard = () => {
 
     fetchAllUserData();
   }, []);
+
+  useEffect(() => {
+    const fetchAccuracy = async () => {
+      if (!user?.$id) return;
+
+      try {
+        const avg = await getAverageAccuracy(user.$id);
+        console.log("Average Accuracy:", avg);
+        setAverageAccuracy(avg);
+      } catch (err) {
+        console.error("❌ Failed to fetch accuracy:", err);
+        setAverageAccuracy(0); // fallback
+      }
+    };
+
+    fetchAccuracy();
+  }, [user]);
 
   useEffect(() => {
     const fetchNudges = async () => {
@@ -83,17 +135,19 @@ const Dashboard = () => {
       const activities = assessmentsResponse.documents
         .filter((assessment) => assessment.feedback?.includes("Accuracy")) // ✅ Keep only quizzes
         .map((assessment) => {
-          const accuracyMatch = assessment.feedback?.match(/Accuracy:\s*(\d+(?:\.\d+)?)%/);
+          const accuracyMatch = assessment.feedback?.match(
+            /Accuracy:\s*(\d+(?:\.\d+)?)%/
+          );
           const accuracy = accuracyMatch ? parseFloat(accuracyMatch[1]) : null;
 
           return {
             type: "quiz",
             moduleID: assessment.moduleID,
-            moduleName: assessment.moduleName || (
-              assessment.moduleID !== "all"
+            moduleName:
+              assessment.moduleName ||
+              (assessment.moduleID !== "all"
                 ? `Module ${parseInt(assessment.moduleID) + 1}`
-                : "All Modules"
-            ),
+                : "All Modules"),
             date: assessment.timestamp,
             score: assessment.score,
             total: 10,
@@ -104,15 +158,11 @@ const Dashboard = () => {
 
       setRecentActivity(activities);
 
-
       setRecentActivity(activities);
     } catch (error) {
       console.error("❌ Error fetching recent activity:", error);
     }
   };
-
-
-
 
   const fetchUserProgress = async () => {
     try {
@@ -132,7 +182,7 @@ const Dashboard = () => {
       let totalQuizCount = 0;
 
       // Process assessments data
-      assessmentsResponse.documents.forEach(assessment => {
+      assessmentsResponse.documents.forEach((assessment) => {
         if (assessment.flashcardsMastered) {
           totalFlashcardsMastered += parseInt(assessment.flashcardsMastered);
         }
@@ -144,7 +194,7 @@ const Dashboard = () => {
           // Add quiz data with date and score
           quizScoresData.push({
             moduleID: assessment.moduleID,
-            moduleName: assessment.moduleName || 'Module',
+            moduleName: assessment.moduleName || "Module",
             score: score,
             total: total,
             accuracy: ((score / total) * 100).toFixed(1),
@@ -160,33 +210,11 @@ const Dashboard = () => {
       setQuizScores(quizScoresData);
 
       // Update user stats
-      setUserStats(prev => ({
+      setUserStats((prev) => ({
         ...prev,
-        avgQuizScore: totalQuizCount > 0 ? (totalQuizScore / totalQuizCount).toFixed(1) : 0
+        avgQuizScore:
+          totalQuizCount > 0 ? (totalQuizScore / totalQuizCount).toFixed(1) : 0,
       }));
-
-      // Calculate streak from quiz dates
-      if (quizScoresData.length > 0) {
-        const dates = quizScoresData.map(q => new Date(q.date).toDateString());
-        const uniqueDates = [...new Set(dates)].sort((a, b) => new Date(b) - new Date(a));
-
-        let streak = 0;
-        const today = new Date().toDateString();
-        const yesterday = new Date(Date.now() - 86400000).toDateString();
-
-        if (uniqueDates[0] === today || uniqueDates[0] === yesterday) {
-          streak = 1;
-          for (let i = 1; i < uniqueDates.length; i++) {
-            const dateDiff = Math.round(
-              (new Date(uniqueDates[i - 1]) - new Date(uniqueDates[i])) / 86400000
-            );
-            if (dateDiff === 1) streak++;
-            else break;
-          }
-        }
-
-        setCurrentStreak(streak);
-      }
     } catch (error) {
       console.error("Error fetching user progress:", error);
       toast.error("Failed to load user progress");
@@ -206,12 +234,14 @@ const Dashboard = () => {
 
       if (response.documents.length > 0) {
         // Process the paths data
-        const processedPaths = response.documents.map(path => {
+        const processedPaths = response.documents.map((path) => {
           return {
             ...path,
             modules: path.modules ? JSON.parse(path.modules) : [],
             aiNudges: path.aiNudges ? JSON.parse(path.aiNudges) : [],
-            completedModules: path.completedModules ? JSON.parse(path.completedModules) : []
+            completedModules: path.completedModules
+              ? JSON.parse(path.completedModules)
+              : [],
           };
         });
 
@@ -232,10 +262,10 @@ const Dashboard = () => {
         }, 0);
 
         // Update user stats
-        setUserStats(prev => ({
+        setUserStats((prev) => ({
           ...prev,
           completedPaths: completedPaths.length,
-          totalModulesCompleted
+          totalModulesCompleted,
         }));
       } else {
         // If no paths found
@@ -259,13 +289,13 @@ const Dashboard = () => {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return '';
+    if (!dateString) return "";
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -286,7 +316,9 @@ const Dashboard = () => {
       icon: "📚",
       gradient: "from-[#ff9d54] to-[#ff8a30]",
       path: "/learning-path",
-      stats: `${paths.length} ${paths.length === 1 ? 'path' : 'paths'} in progress`,
+      stats: `${paths.length} ${
+        paths.length === 1 ? "path" : "paths"
+      } in progress`,
     },
     {
       title: "Flashcards",
@@ -294,7 +326,9 @@ const Dashboard = () => {
       icon: "🗂️",
       gradient: "from-[#ff9d54] to-[#ff8a30]",
       path: "/flashcards",
-      stats: `${flashcardCount} ${flashcardCount === 1 ? 'card' : 'cards'} mastered`,
+      stats: `${flashcardCount} ${
+        flashcardCount === 1 ? "card" : "cards"
+      } mastered`,
     },
     {
       title: "Quiz Performance",
@@ -302,7 +336,7 @@ const Dashboard = () => {
       icon: "📊",
       gradient: "from-[#ff9d54] to-[#ff8a30]",
       path: "/quiz",
-      stats: `${calculateSuccessRate()}% success rate`,
+      stats: `${averageAccuracy}% success rate`,
     },
   ];
 
@@ -312,28 +346,28 @@ const Dashboard = () => {
       label: "New Path",
       description: "Start a learning journey",
       path: "/learning-path",
-      gradient: "from-[#ff9d54] to-[#ff8a30]"
+      gradient: "from-[#ff9d54] to-[#ff8a30]",
     },
     {
       icon: "🗂️",
       label: "Flashcards",
       description: "Create study cards",
       path: "/flashcards",
-      gradient: "from-[#ff9d54] to-[#ff8a30]"
+      gradient: "from-[#ff9d54] to-[#ff8a30]",
     },
     {
       icon: "📝",
       label: "Quiz",
       description: "Test your knowledge",
       path: "/quiz",
-      gradient: "from-[#ff9d54] to-[#ff8a30]"
+      gradient: "from-[#ff9d54] to-[#ff8a30]",
     },
     {
       icon: "📈",
       label: "Progress",
       description: "Track your growth",
       path: "/progress",
-      gradient: "from-[#ff9d54] to-[#ff8a30]"
+      gradient: "from-[#ff9d54] to-[#ff8a30]",
     },
   ];
 
@@ -374,29 +408,36 @@ const Dashboard = () => {
                   <div className="px-4 py-2 bg-[#3a3a3a] rounded-xl w-24 h-9 animate-pulse"></div>
                 ) : (
                   <div className="px-4 py-2 bg-[#3a3a3a] text-[#ff9d54] rounded-xl">
-                    Avg Quiz: {userStats.avgQuizScore}/10
+                    Avg Quiz: {averageAccuracy}%
                   </div>
                 )}
               </div>
             </motion.div>
-
             {/* Stats cards */}
             <div className="mt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               <div className="bg-[#2a2a2a] p-4 rounded-xl shadow-sm">
                 <p className="text-gray-400 text-sm">Paths Progress</p>
-                <p className="text-2xl font-semibold text-white">{paths.length}</p>
+                <p className="text-2xl font-semibold text-white">
+                  {paths.length}
+                </p>
               </div>
               <div className="bg-[#2a2a2a] p-4 rounded-xl shadow-sm">
                 <p className="text-gray-400 text-sm">Paths Completed</p>
-                <p className="text-2xl font-semibold text-white">{userStats.completedPaths}</p>
+                <p className="text-2xl font-semibold text-white">
+                  {userStats.completedPaths}
+                </p>
               </div>
               <div className="bg-[#2a2a2a] p-4 rounded-xl shadow-sm">
                 <p className="text-gray-400 text-sm">Modules Completed</p>
-                <p className="text-2xl font-semibold text-white">{userStats.totalModulesCompleted}</p>
+                <p className="text-2xl font-semibold text-white">
+                  {userStats.totalModulesCompleted}
+                </p>
               </div>
               <div className="bg-[#2a2a2a] p-4 rounded-xl shadow-sm">
                 <p className="text-gray-400 text-sm">Success Rate</p>
-                <p className="text-2xl font-semibold text-white">{calculateSuccessRate()}%</p>
+                <p className="text-2xl font-semibold text-white">
+                  {averageAccuracy}%
+                </p>
               </div>
             </div>
           </div>
@@ -415,7 +456,9 @@ const Dashboard = () => {
               whileTap={{ scale: 0.98 }}
               className="group relative overflow-hidden bg-[#2a2a2a]/60 backdrop-blur-sm p-5 rounded-2xl border border-[#3a3a3a] shadow transition-all duration-300"
             >
-              <div className={`absolute inset-0 bg-gradient-to-r ${action.gradient} opacity-0 group-hover:opacity-10 transition-opacity`} />
+              <div
+                className={`absolute inset-0 bg-gradient-to-r ${action.gradient} opacity-0 group-hover:opacity-10 transition-opacity`}
+              />
               <div className="relative space-y-3">
                 <span className="text-3xl block mb-2">{action.icon}</span>
                 <div>
@@ -430,44 +473,12 @@ const Dashboard = () => {
         {/* Main content area with conditional loading */}
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => <CardSkeleton key={i} />)}
+            {[1, 2, 3].map((i) => (
+              <CardSkeleton key={i} />
+            ))}
           </div>
         ) : (
           <>
-            {/* Enhanced Main Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {cards.map((card, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{
-                    scale: 1.02,
-                    boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)"
-                  }}
-                  onClick={() => navigate(card.path)}
-                  className="group relative overflow-hidden bg-[#2a2a2a]/70 backdrop-blur-sm p-6 rounded-2xl border border-[#3a3a3a] shadow transition-all duration-300 cursor-pointer"
-                >
-                  <div className={`absolute inset-0 bg-gradient-to-r ${card.gradient} opacity-0 group-hover:opacity-10 transition-opacity`} />
-                  <div className="relative space-y-4">
-                    <div className="text-4xl group-hover:scale-110 transition-transform">
-                      {card.icon}
-                    </div>
-                    <div className="space-y-2">
-                      <h2 className="text-xl font-semibold text-white">
-                        {card.title}
-                      </h2>
-                      <p className="text-gray-400">{card.description}</p>
-                    </div>
-                    <div className="inline-flex items-center gap-2 text-sm font-medium px-3 py-1 rounded-full bg-gradient-to-r from-[#3a3a3a] to-[#333333] text-[#ff9d54]">
-                      {card.stats}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-
             {/* Add nudges section */}
             {!isLoading && aiNudges.length > 0 && (
               <motion.div
@@ -482,7 +493,7 @@ const Dashboard = () => {
                     type={nudge.type}
                     icon={nudge.icon}
                     actionText={nudge.actionText}
-                    onAction={() => navigate('/learning-path')}
+                    onAction={() => navigate("/learning-path")}
                   />
                 ))}
               </motion.div>
@@ -495,7 +506,8 @@ const Dashboard = () => {
                 {paths.length > 0 ? (
                   <div className="bg-[#2a2a2a]/70 backdrop-blur-sm p-6 rounded-2xl border border-[#3a3a3a] shadow">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-white">
-                      <span className="text-[#ff9d54]">📚</span> Your Learning Paths
+                      <span className="text-[#ff9d54]">📚</span> Your Learning
+                      Paths
                     </h2>
                     <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                       {paths.map((path, index) => (
@@ -507,7 +519,9 @@ const Dashboard = () => {
                           className="bg-[#1c1b1b]/70 p-4 rounded-xl hover:bg-[#333333] transition-colors"
                         >
                           <div className="flex justify-between items-center">
-                            <h3 className="font-medium text-white">{path.careerName}</h3>
+                            <h3 className="font-medium text-white">
+                              {path.careerName}
+                            </h3>
                             <span className="text-sm bg-[#3a3a3a] text-[#ff9d54] px-2.5 py-0.5 rounded-full">
                               {path.progress}%
                             </span>
@@ -520,7 +534,8 @@ const Dashboard = () => {
                           </div>
                           <div className="mt-4 flex justify-between items-center">
                             <span className="text-xs text-gray-400">
-                              {path.completedModules?.length || 0}/{path.modules?.length || 0} modules
+                              {path.completedModules?.length || 0}/
+                              {path.modules?.length || 0} modules
                             </span>
                             <button
                               onClick={(e) => {
@@ -537,9 +552,11 @@ const Dashboard = () => {
                     </div>
                     {paths.length === 0 && (
                       <div className="text-center py-8">
-                        <p className="text-gray-400">No paths in progress yet</p>
+                        <p className="text-gray-400">
+                          No paths in progress yet
+                        </p>
                         <button
-                          onClick={() => navigate('/learning-path')}
+                          onClick={() => navigate("/learning-path")}
                           className="mt-4 bg-[#ff9d54] hover:bg-[#ff8a30] text-white px-6 py-2 rounded-lg transition-colors"
                         >
                           Create a Learning Path
@@ -550,10 +567,15 @@ const Dashboard = () => {
                 ) : (
                   <div className="bg-[#2a2a2a]/70 backdrop-blur-sm p-6 rounded-2xl border border-[#3a3a3a] shadow text-center py-12">
                     <div className="text-5xl mb-4">🎯</div>
-                    <h3 className="text-xl font-medium mb-2 text-white">Start Your Learning Journey</h3>
-                    <p className="text-gray-400 mb-6">Create your first learning path and begin your journey to success</p>
+                    <h3 className="text-xl font-medium mb-2 text-white">
+                      Start Your Learning Journey
+                    </h3>
+                    <p className="text-gray-400 mb-6">
+                      Create your first learning path and begin your journey to
+                      success
+                    </p>
                     <button
-                      onClick={() => navigate('/learning-path')}
+                      onClick={() => navigate("/learning-path")}
                       className="bg-[#ff9d54] hover:bg-[#ff8a30] text-white px-6 py-2 rounded-lg transition-colors"
                     >
                       Create Path
@@ -566,23 +588,29 @@ const Dashboard = () => {
               <div className="lg:col-span-2">
                 <div className="bg-[#2a2a2a]/70 backdrop-blur-sm p-6 rounded-2xl border border-[#3a3a3a] shadow">
                   <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-white">
-                    <span className="text-[#ff9d54]">📊</span> Recent Quiz Activity
+                    <span className="text-[#ff9d54]">📊</span> Recent Quiz
+                    Activity
                   </h2>
                   <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                     {recentActivity.length > 0 ? (
                       recentActivity.map((activity, index) => (
-                        <div key={index} className="border-l-4 border-[#ff9d54] pl-4 py-1">
+                        <div
+                          key={index}
+                          className="border-l-4 border-[#ff9d54] pl-4 py-1"
+                        >
                           <div className="flex justify-between items-start">
                             <div>
                               <p className="font-medium text-white">
-                                {activity.type === 'quiz' ? '📝 Quiz' : '🗂️ Flashcards'}
+                                {activity.type === "quiz"
+                                  ? "📝 Quiz"
+                                  : "🗂️ Flashcards"}
                               </p>
                               <p className="text-sm text-gray-400">
                                 {activity.moduleName || "Untitled Module"}
                               </p>
                             </div>
 
-                            {activity.type === 'quiz' && (
+                            {activity.type === "quiz" && (
                               <div className="flex flex-col items-end text-right">
                                 <span className="bg-[#3a3a3a] text-center text-[#ff9d54] text-xs px-2.5 py-1 rounded-full break-words max-w-[120px]">
                                   {activity.feedback || "No feedback"}
@@ -590,12 +618,16 @@ const Dashboard = () => {
                               </div>
                             )}
                           </div>
-                          <p className="text-xs text-gray-500 mt-1">{formatDate(activity.date)}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {formatDate(activity.date)}
+                          </p>
                         </div>
                       ))
                     ) : (
                       <div className="text-center py-8">
-                        <p className="text-gray-400">No activity recorded yet</p>
+                        <p className="text-gray-400">
+                          No activity recorded yet
+                        </p>
                         <p className="text-gray-500 text-sm mt-2">
                           Complete quizzes to see your progress
                         </p>

@@ -12,6 +12,7 @@ import { Databases } from "appwrite";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useStreak } from "../context/StreakContext";
 import {
   RiBookOpenLine,
   RiCheckLine,
@@ -27,6 +28,7 @@ import {
 } from "react-icons/ri";
 import PointToast from "../components/PointToast";
 import { useAuth } from "../context/AuthContext";
+import { usePoints } from "../context/PointsContext";
 
 const ModuleDetails = () => {
   const { pathId, moduleIndex } = useParams();
@@ -44,6 +46,8 @@ const ModuleDetails = () => {
   const databases = new Databases(client);
   const [showToast, setShowToast] = useState(false);
   const [pointsEarned, setPointsEarned] = useState(0);
+  const { setPoints } = usePoints();
+  const { refreshStreak } = useStreak();
 
   // New states for topic elaboration popup
   const [isPopupOpen, setIsPopupOpen] = useState(false);
@@ -181,10 +185,13 @@ const ModuleDetails = () => {
       const earned = 5;
       await updatePoints(user.$id, earned); // your reusable DB function
       setPointsEarned(earned);
+      setPoints((prev) => prev + earned);
       setShowToast(true);
 
       // ✅ Optional: update local UI
       setIsCompleted(true);
+
+      refreshStreak();
 
       // ✅ Optional: show success or navigate back to LearningPath
       setTimeout(() => {

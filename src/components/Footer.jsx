@@ -14,13 +14,13 @@ import {
 
 const Footer = () => {
   const handleReportBug = () => {
-    window.location.href = "mailto:connect@ayush-sharma.in?subject=Report%20Feedback/Bug%20on%20pathgenie";
+    window.location.href = "mailto:connect@ayush-sharma.in?subject=Report%20Feedback/Bug%20on%20SkillCompass";
   };
 
   const socialLinks = [
     { 
       icon: <RiGithubFill className="w-6 h-6" />, 
-      href: 'https://github.com/Glucon-D/pathgenie',
+      href: 'https://github.com/Glucon-D/SkillCompass',
       label: 'GitHub'
     },
     { 
@@ -43,7 +43,7 @@ const Footer = () => {
             >
               <RiMagicLine className="text-3xl text-[#ff9d54]" /> {/* Changed icon and color to match Navbar */}
               <div className="text-2xl font-bold bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] bg-clip-text text-transparent">
-                PathGenie
+                SkillCompass
               </div>
             </motion.div>
             <motion.p 
@@ -54,7 +54,7 @@ const Footer = () => {
             >
               Made with <RiHeartFill className="text-red-500 animate-pulse" /> by
               <a 
-                href="https://pathgenie.ayush-sharma.in" 
+                href="https://SkillCompass.ayush-sharma.in" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="font-medium text-[#ff9d54] hover:text-[#ff8a30] flex items-center gap-1"
@@ -107,7 +107,7 @@ const Footer = () => {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
         >
-          © {new Date().getFullYear()} pathgenie. All rights reserved.
+          © {new Date().getFullYear()} SkillCompass. All rights reserved.
         </motion.p>
       </div>
     </footer>

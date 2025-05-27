@@ -13,8 +13,28 @@ import {
 import { account } from "../config/appwrite";
 import QuizStreak from "./Streak";
 import { getUserProgress } from "../config/database";
-import { format, differenceInDays, parseISO } from "date-fns";
 import { getStreakData } from "../config/database";
+import { databases } from "../config/database";
+import { Query } from "appwrite";
+
+const getAssessmentCount = async (userId) => {
+  const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
+  const ASSESSMENTS_COLLECTION_ID = import.meta.env
+    .VITE_ASSESSMENTS_COLLECTION_ID;
+
+  try {
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      ASSESSMENTS_COLLECTION_ID,
+      [Query.equal("userID", userId)]
+    );
+
+    return response.total; // ✅ Return number of documents
+  } catch (error) {
+    console.error("❌ Failed to fetch assessment count:", error);
+    return 0; // Return 0 if any error
+  }
+};
 
 const Settings = () => {
   const { user, loading, updateUser } = useAuth();
@@ -25,8 +45,18 @@ const Settings = () => {
     email: user?.email || "",
   });
   const [updateStatus, setUpdateStatus] = useState({ type: "", message: "" });
-
   const [streakDates, setStreakDates] = useState(new Set());
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    const fetchCount = async () => {
+      if (user?.$id) {
+        const result = await getAssessmentCount(user.$id);
+        setCount(result);
+      }
+    };
+    fetchCount();
+  }, [user]);
 
   useEffect(() => {
     const fetchStreak = async () => {
@@ -245,10 +275,8 @@ const Settings = () => {
                 <RiMedalLine className="text-[#ff9d54] text-xl" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Total Quizzes</p>
-                <p className="text-xl font-bold text-[#ff9d54]">
-                  {quizScores.length}
-                </p>
+                <p className="text-sm text-gray-400">Total Quizzes given</p>
+                <p className="text-xl font-bold text-[#ff9d54]">{count}</p>
               </div>
             </div>
           </motion.div>

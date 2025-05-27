@@ -9,6 +9,31 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Check for existing session when component mounts
+  useEffect(() => {
+    const checkInitialSession = async () => {
+      setLoading(true);
+      try {
+        const session = await account.getSession('current');
+        if (session) {
+          const userData = await account.get();
+          console.log("Session found, user authenticated:", userData.$id);
+          setUser(userData);
+        } else {
+          console.log("No session found");
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Error checking session:", error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkInitialSession();
+  }, []);
+
   const checkUser = async () => {
     try {
       const session = await account.getSession('current');
@@ -23,47 +48,37 @@ export const AuthProvider = ({ children }) => {
       console.error('Session error:', error);
       setUser(null);
       return null;
+    }
+  };
+
+  const login = async (email, password) => {
+    setLoading(true);
+    try {
+      console.log("Attempting login for:", email);
+      await account.createEmailPasswordSession(email, password);
+      const userData = await account.get();
+      console.log("Login successful, user:", userData.$id);
+      setUser(userData);
+      console.log("Navigating to dashboard");
+      navigate('/dashboard', { replace: true });
+      return userData;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    checkUser();
-  }, []);
-
-  const login = async (email, password) => {
+  const signup = async (email, password, name) => {
     setLoading(true);
     try {
-      // First, check if there's an active session
-      try {
-        await account.get();
-        // If we get here, there's an active session, so delete it first
-        await account.deleteSession('current');
-      } catch (error) {
-        // No active session, continue with login
-        console.log('No active session found');
-      }
-
-      // Now proceed with login
-      const session = await account.createEmailPasswordSession(email, password);
-      const userData = await account.get();
-      setUser(userData);
-      setLoading(false);
-      navigate('/dashboard', { replace: true });
-      return userData;
+      const user = await account.create('unique()', email, password, name);
+      console.log("User created:", user.$id);
+      return login(email, password);
     } catch (error) {
       setLoading(false);
-      console.error('Login error:', error);
-      throw error;
-    }
-  };
-
-  const signup = async (email, password, name) => {
-    try {
-      await account.create('unique()', email, password, name);
-      await login(email, password);
-    } catch (error) {
+      console.error('Signup error:', error);
       throw error;
     }
   };
@@ -81,7 +96,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Add updateUser function
   const updateUser = (newUserData) => {
     setUser(newUserData);
   };
@@ -90,28 +104,35 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const intervalId = setInterval(async () => {
       if (user) {
-        const userData = await checkUser();
-        if (!userData) {
-          // Session expired
+        try {
+          const userData = await checkUser();
+          if (!userData) {
+            console.log("Session expired, redirecting to login");
+            navigate('/login', { replace: true });
+          }
+        } catch (error) {
+          console.error("Session check error:", error);
           navigate('/login', { replace: true });
         }
       }
     }, 300000); // Check every 5 minutes
 
     return () => clearInterval(intervalId);
-  }, [user]);
+  }, [user, navigate]);
+
+  const contextValue = {
+    user,
+    loading,
+    login,
+    signup,
+    logout,
+    updateUser,
+    isAuthenticated: !!user
+  };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      login, 
-      signup, 
-      logout,
-      updateUser, // Add updateUser to the context value
-      isAuthenticated: !!user 
-    }}>
-      {!loading && children}
+    <AuthContext.Provider value={contextValue}>
+      {children}
     </AuthContext.Provider>
   );
 };

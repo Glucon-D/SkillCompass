@@ -12,7 +12,10 @@ import {
   RiChat1Line,
   RiSettings4Line,
   RiFileCopyLine,
-  RiCheckLine
+  RiCheckLine,
+  RiArrowDownSLine,
+  RiArrowUpSLine,
+  RiStarLine
 } from 'react-icons/ri';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -34,6 +37,8 @@ const Chat = () => {
   const [pathsData, setPathsData] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(true);
+  const [animateInput, setAnimateInput] = useState(false);
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -42,6 +47,16 @@ const Chat = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Initialize chat with welcome message
+  useEffect(() => {
+    if (messages.length === 0) {
+      setMessages([{ 
+        role: 'assistant', 
+        content: "👋 Hi! I'm your AI learning assistant. I have access to your learning paths and can help you with specific topics or general guidance. What would you like to discuss?" 
+      }]);
+    }
+  }, []);
 
   const preprocessGeminiResponse = (content) => {
     // Ensure code blocks are properly formatted
@@ -67,6 +82,8 @@ const Chat = () => {
     setInput('');
     setLoading(true);
     setIsTyping(true);
+    setAnimateInput(true);
+    setTimeout(() => setAnimateInput(false), 300);
 
     try {
       // Create enhanced context with learning paths
@@ -171,12 +188,12 @@ const Chat = () => {
               const code = String(children).replace(/\n$/, '');
               
               return !inline && match ? (
-                <div className="my-2 sm:my-4 rounded-lg overflow-hidden bg-gray-800">
-                  <div className="px-2 sm:px-4 py-1.5 sm:py-2 flex justify-between items-center border-b border-gray-700">
-                    <span className="text-[10px] sm:text-xs text-gray-400 uppercase">{match[1]}</span>
+                <div className="my-2 sm:my-4 rounded-lg overflow-hidden bg-gray-800 border border-[#3a3a3a]">
+                  <div className="px-2 sm:px-4 py-1.5 sm:py-2 flex justify-between items-center border-b border-gray-700 bg-[#1c1b1b]">
+                    <span className="text-[10px] sm:text-xs text-[#ff9d54] uppercase">{match[1]}</span>
                     <button
                       onClick={() => handleCopyCode(code)}
-                      className="text-gray-400 hover:text-gray-200 transition-colors text-xs sm:text-sm flex items-center gap-1"
+                      className="text-gray-400 hover:text-[#ff9d54] transition-colors text-xs sm:text-sm flex items-center gap-1"
                     >
                       {copiedCode === code ? (
                         <>
@@ -197,10 +214,10 @@ const Chat = () => {
                       language={match[1]}
                       customStyle={{
                         margin: 0,
-                        padding: '0.5rem',
-                        background: 'transparent',
-                        fontSize: '0.8rem',
-                        lineHeight: '1.2'
+                        padding: '0.75rem',
+                        background: '#1e1e1e',
+                        fontSize: '0.85rem',
+                        lineHeight: '1.4'
                       }}
                       wrapLines={true}
                       wrapLongLines={true}
@@ -210,7 +227,7 @@ const Chat = () => {
                   </div>
                 </div>
               ) : (
-                <code className="px-1.5 py-0.5 text-sm rounded bg-gray-100 text-gray-800 break-all" {...props}>
+                <code className="px-1.5 py-0.5 text-sm rounded bg-[#3a3a3a] text-[#ff9d54] break-all" {...props}>
                   {children}
                 </code>
               );
@@ -219,7 +236,25 @@ const Chat = () => {
             ul: ({ children }) => <ul className="list-disc pl-4 mb-2 sm:mb-4 last:mb-0 text-sm sm:text-base">{children}</ul>,
             ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 sm:mb-4 last:mb-0 text-sm sm:text-base">{children}</ol>,
             li: ({ children }) => <li className="mb-1 last:mb-0">{children}</li>,
-            pre: ({ children }) => <pre className="overflow-x-auto max-w-full">{children}</pre>
+            pre: ({ children }) => <pre className="overflow-x-auto max-w-full">{children}</pre>,
+            h1: ({ children }) => <h1 className="text-xl font-bold mb-3 text-[#ff9d54]">{children}</h1>,
+            h2: ({ children }) => <h2 className="text-lg font-bold mb-2 text-[#ff9d54]">{children}</h2>,
+            h3: ({ children }) => <h3 className="text-md font-bold mb-2 text-[#ff9d54]">{children}</h3>,
+            a: ({ children, href }) => (
+              <a 
+                href={href} 
+                target="_blank" 
+                rel="noreferrer" 
+                className="text-[#ff9d54] underline hover:text-[#ff8a30] transition-colors"
+              >
+                {children}
+              </a>
+            ),
+            blockquote: ({ children }) => (
+              <blockquote className="border-l-4 border-[#ff9d54] pl-4 italic text-gray-300 my-2">
+                {children}
+              </blockquote>
+            ),
           }}
         >
           {content}
@@ -229,23 +264,49 @@ const Chat = () => {
   };
 
   const renderSuggestions = () => (
-    <div className="flex flex-wrap gap-2 px-4 py-2 bg-[#1c1b1b]">
-      {suggestions.map((suggestion, index) => (
-        <motion.button
-          key={index}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="px-3 py-1.5 bg-[#3a3a3a] hover:bg-[#ff9d54]/20 text-[#ff9d54] rounded-full text-sm transition-colors"
-          onClick={() => {
-            setInput(suggestion);
-            // Automatically send after a short delay
-            setTimeout(() => handleSend(), 100);
-          }}
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 10 }}
+      className="flex flex-wrap gap-2 px-4 py-3 bg-[#1c1b1b] border-t border-[#3a3a3a]"
+    >
+      <div className="w-full flex justify-between items-center mb-2">
+        <span className="text-xs text-gray-400 flex items-center gap-1">
+          <RiLightbulbLine className="text-[#ff9d54]" /> Suggestions
+        </span>
+        <button 
+          onClick={() => setShowSuggestions(!showSuggestions)}
+          className="text-xs text-gray-400 hover:text-[#ff9d54] flex items-center gap-1"
         >
-          {suggestion}
-        </motion.button>
-      ))}
-    </div>
+          {showSuggestions ? (
+            <>Hide <RiArrowUpSLine className="w-3 h-3" /></>
+          ) : (
+            <>Show <RiArrowDownSLine className="w-3 h-3" /></>
+          )}
+        </button>
+      </div>
+      
+      {showSuggestions && (
+        <div className="w-full flex flex-wrap gap-2">
+          {suggestions.map((suggestion, index) => (
+            <motion.button
+              key={index}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="px-3 py-1.5 bg-[#2a2a2a] hover:bg-[#ff9d54]/20 text-[#ff9d54] rounded-full text-sm transition-colors border border-[#3a3a3a] flex items-center gap-1"
+              onClick={() => {
+                setInput(suggestion);
+                // Automatically send after a short delay
+                setTimeout(() => handleSend(), 100);
+              }}
+            >
+              <RiLightbulbLine className="w-3 h-3 text-[#ff9d54]" />
+              {suggestion}
+            </motion.button>
+          ))}
+        </div>
+      )}
+    </motion.div>
   );
 
   return (
@@ -288,62 +349,64 @@ const Chat = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => window.location.reload()}
-                className="p-2 text-[#ff9d54] hover:bg-[#3a3a3a] rounded-lg transition-colors"
-                title="New Chat"
-              >
-                <RiRefreshLine className="w-5 h-5" />
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
                 onClick={handlePurgeChat}
-                className="p-2 text-red-500 hover:bg-[#3a3a3a] rounded-lg transition-colors"
+                className="p-2 bg-[#3a3a3a] hover:bg-[#444] text-red-400 hover:text-red-500 rounded-lg transition-colors flex items-center gap-1"
                 title="Clear chat"
               >
                 <RiDeleteBin6Line className="w-5 h-5" />
+                <span className="hidden sm:inline text-sm">Clear</span>
               </motion.button>
             </div>
           </div>
         </div>
 
         {/* Enhanced Chat Messages */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 bg-[#1c1b1b]">
+        <div className="flex-1 overflow-y-auto bg-gradient-to-b from-[#1c1b1b] to-[#252525]">
+          <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
             <AnimatePresence>
               {messages.map((message, index) => (
                 <motion.div
                   key={index}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
                   className={`flex items-start gap-3 ${
                     message.role === 'user' ? 'flex-row-reverse' : ''
                   }`}
                 >
-                  <motion.div 
-                    whileHover={{ scale: 1.1 }}
-                    className={`flex-shrink-0 p-1.5 rounded-lg ${
-                      message.role === 'user' 
-                        ? 'bg-gradient-to-br from-[#ff9d54] to-[#ff8a30]' 
-                        : 'bg-gradient-to-br from-[#3a3a3a] to-[#2a2a2a]'
-                    }`}
-                  >
-                    {message.role === 'user' ? (
-                      <RiUserLine className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                    ) : (
-                      <RiRobot2Line className="w-4 h-4 sm:w-5 sm:h-5 text-[#ff9d54]" />
-                    )}
-                  </motion.div>
+                  <div className={`flex-shrink-0 ${message.role === 'user' ? 'mt-1' : ''}`}>
+                    <motion.div 
+                      whileHover={{ scale: 1.1 }}
+                      className={`p-2 rounded-lg shadow-md ${
+                        message.role === 'user' 
+                          ? 'bg-gradient-to-br from-[#ff9d54] to-[#ff8a30]' 
+                          : 'bg-gradient-to-br from-[#3a3a3a] to-[#2a2a2a]'
+                      }`}
+                    >
+                      {message.role === 'user' ? (
+                        <RiUserLine className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                      ) : (
+                        <RiRobot2Line className="w-5 h-5 sm:w-6 sm:h-6 text-[#ff9d54]" />
+                      )}
+                    </motion.div>
+                  </div>
+                  
                   <motion.div 
                     whileHover={{ scale: 1.01 }}
-                    className={`max-w-[88%] sm:max-w-[85%] p-2 sm:p-4 rounded-xl shadow-sm ${
+                    className={`max-w-[85%] sm:max-w-[80%] p-3 sm:p-5 rounded-2xl shadow-md ${
                       message.role === 'user' 
                         ? 'bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] text-white ml-auto rounded-tr-none'
-                        : 'bg-[#2a2a2a] text-white rounded-tl-none'
+                        : 'bg-[#2a2a2a] text-white rounded-tl-none border border-[#3a3a3a]'
                     }`}
                   >
                     {formatMessage(message.content)}
+                    
+                    {/* Timestamp for messages */}
+                    <div className={`text-[10px] mt-2 flex justify-end ${
+                      message.role === 'user' ? 'text-white/70' : 'text-gray-500'
+                    }`}>
+                      {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </div>
                   </motion.div>
                 </motion.div>
               ))}
@@ -353,43 +416,58 @@ const Chat = () => {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-2 text-gray-400"
+                className="flex items-start gap-3"
               >
-                <div className="flex items-center gap-1">
-                  <motion.div
-                    animate={{ y: [0, -5, 0] }}
-                    transition={{ duration: 0.5, repeat: Infinity, repeatType: "reverse" }}
-                    className="w-2 h-2 bg-[#ff9d54] rounded-full"
-                  />
-                  <motion.div
-                    animate={{ y: [0, -5, 0] }}
-                    transition={{ duration: 0.5, delay: 0.2, repeat: Infinity, repeatType: "reverse" }}
-                    className="w-2 h-2 bg-[#ff9d54] rounded-full"
-                  />
-                  <motion.div
-                    animate={{ y: [0, -5, 0] }}
-                    transition={{ duration: 0.5, delay: 0.3, repeat: Infinity, repeatType: "reverse" }}
-                    className="w-2 h-2 bg-[#ff9d54] rounded-full"
-                  />
+                <div className="flex-shrink-0">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-[#3a3a3a] to-[#2a2a2a]">
+                    <RiRobot2Line className="w-5 h-5 sm:w-6 sm:h-6 text-[#ff9d54]" />
+                  </div>
                 </div>
-                <span className="text-sm">AI is thinking...</span>
+                <div className="bg-[#2a2a2a] p-4 rounded-2xl rounded-tl-none border border-[#3a3a3a] shadow-md">
+                  <div className="flex items-center gap-2">
+                    <div className="flex space-x-1">
+                      <motion.div
+                        animate={{ scale: [0.8, 1.2, 0.8] }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                        className="w-2 h-2 bg-[#ff9d54] rounded-full"
+                      />
+                      <motion.div
+                        animate={{ scale: [0.8, 1.2, 0.8] }}
+                        transition={{ duration: 1, delay: 0.2, repeat: Infinity }}
+                        className="w-2 h-2 bg-[#ff9d54] rounded-full"
+                      />
+                      <motion.div
+                        animate={{ scale: [0.8, 1.2, 0.8] }}
+                        transition={{ duration: 1, delay: 0.4, repeat: Infinity }}
+                        className="w-2 h-2 bg-[#ff9d54] rounded-full"
+                      />
+                    </div>
+                    <span className="text-sm text-gray-400">Generating response...</span>
+                  </div>
+                </div>
               </motion.div>
             )}
+            <div ref={chatEndRef} />
           </div>
-          {/* Show suggestions above input */}
-          {!isTyping && renderSuggestions()}
         </div>
+
+        {/* Show suggestions above input */}
+        {!isTyping && suggestions.length > 0 && renderSuggestions()}
 
         {/* Enhanced Input Area */}
         <div className="border-t border-[#3a3a3a] bg-[#1c1b1b] p-4">
-          <div className="flex items-end gap-3 max-w-4xl mx-auto">
-            <div className="flex-1 bg-[#2a2a2a] rounded-xl shadow-sm">
+          <motion.div 
+            animate={animateInput ? { scale: [1, 0.98, 1] } : {}}
+            transition={{ duration: 0.3 }}
+            className="flex items-end gap-3 max-w-4xl mx-auto"
+          >
+            <div className="flex-1 bg-[#2a2a2a] rounded-xl shadow-md border border-[#3a3a3a] focus-within:border-[#ff9d54] focus-within:ring-2 focus-within:ring-[#ff9d54]/20 transition-all">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Ask me anything about your learning journey..."
-                className="w-full p-3 rounded-xl border border-[#3a3a3a] focus:border-[#ff9d54] focus:ring-2 focus:ring-[#ff9d54]/20 outline-none resize-none bg-transparent text-white"
+                className="w-full p-3 rounded-xl border-none focus:ring-0 outline-none resize-none bg-transparent text-white"
                 rows="1"
                 style={{
                   minHeight: '44px',
@@ -406,10 +484,15 @@ const Chat = () => {
               whileTap={{ scale: 0.95 }}
               onClick={handleSend}
               disabled={loading || !input.trim()}
-              className="p-3 bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] text-white rounded-xl disabled:opacity-50 shadow-lg hover:shadow-[#ff9d54]/20"
+              className="p-3 bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] text-white rounded-xl disabled:opacity-50 shadow-lg hover:shadow-[#ff9d54]/20 disabled:cursor-not-allowed"
             >
               <RiSendPlaneFill className="w-5 h-5" />
             </motion.button>
+          </motion.div>
+          
+          {/* Keyboard shortcuts hint */}
+          <div className="mt-2 text-center text-xs text-gray-500">
+            Press Enter to send, Shift+Enter for new line
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import axios from "axios";
+import JSON5 from "json5";
 
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
@@ -75,39 +76,76 @@ const sanitizeJSON = (text) => {
     const jsonMatch = cleanedText.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
     if (!jsonMatch) return text;
 
-    // Clean up the extracted JSON
+    // More aggressive cleaning for problematic characters
     let jsonText = jsonMatch[0]
       .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Remove control characters
-      .replace(/\\[^"\\\/bfnrtu]/g, "\\\\") // Fix invalid escapes
+      .replace(/\\(?!["\\/bfnrtu])/g, "\\\\") // Fix invalid escapes
       .replace(/\\n/g, " ") // Replace newlines with spaces
       .replace(/\r?\n|\r/g, " ") // Replace carriage returns
-      .replace(/,\s*}/g, "}") // Fix trailing commas
-      .replace(/,\s*\]/g, "]") // Fix trailing commas
+      .replace(/,(\s*[}\]])/g, "$1") // Remove trailing commas
+      .replace(/([^\\])\\"/g, '$1\\\\"') // Fix double quote escaping
+      .replace(/([^\\])\\/g, '$1\\\\') // Fix backslash escaping
+      .replace(/"\s+"/g, '" "') // Fix spaces between quotes
+      .replace(/"\s*:\s*"/g, '":"') // Fix spaces in key-value pairs
       .trim();
 
-    // Validate if it's parseable
-    JSON.parse(jsonText);
-
-    return jsonText;
+    try {
+      // First try with JSON5
+      return JSON5.parse(jsonText);
+    } catch (json5Error) {
+      console.warn("JSON5 parse failed, trying fallback cleaning:", json5Error.message);
+      
+      // More aggressive cleaning if JSON5 fails
+      jsonText = jsonText
+        .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?\s*:/g, '"$2":') // Ensure property names are quoted
+        .replace(/'/g, '"') // Replace single quotes with double quotes
+        .replace(/\\"/g, '\\"') // Fix escaped quotes
+        .replace(/\\\\/g, '\\') // Fix double backslashes
+        .replace(/,\s*}/g, "}") // Remove trailing commas in objects
+        .replace(/,\s*\]/g, "]"); // Remove trailing commas in arrays
+      
+      // Try to manually fix the JSON structure
+      try {
+        return JSON5.parse(jsonText);
+      } catch (finalError) {
+        console.error("Final JSON5 parse attempt failed:", finalError);
+        
+        // Last resort: try to create a valid JSON structure manually
+        if (text.includes("frontHTML") && text.includes("backHTML")) {
+          // This is likely a flashcard response
+          const cards = [];
+          const cardMatches = text.match(/\{\s*"id"\s*:\s*\d+[\s\S]*?(?=\}\s*,\s*\{|\}\s*\]|\}$)/g);
+          
+          if (cardMatches) {
+            cardMatches.forEach((cardText, index) => {
+              cards.push({
+                id: index + 1,
+                frontHTML: extractValue(cardText, "frontHTML") || `Question ${index + 1}`,
+                backHTML: extractValue(cardText, "backHTML") || `Answer ${index + 1}`
+              });
+            });
+            
+            if (cards.length > 0) {
+              return cards;
+            }
+          }
+        }
+        
+        // If we can't extract structured data, return the cleaned text for manual parsing
+        return text;
+      }
+    }
   } catch (error) {
     console.error("JSON sanitization error", error);
-
-    // More aggressive fallback cleaning
-    try {
-      // Try to find and fix common JSON issues
-      let attempt = text
-        .replace(/```(?:json)?|```/g, "") // Remove code blocks
-        .replace(/\/\//g, "") // Remove comments
-        .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?\s*:/g, '"$2":') // Ensure property names are quoted
-        .replace(/,(\s*[}\]])/g, "$1") // Remove trailing commas
-        .trim();
-
-      const match = attempt.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-      return match ? match[0] : text;
-    } catch (e) {
-      return text; // Return original if all attempts fail
-    }
+    return text; // Return original text if all attempts fail
   }
+};
+
+// Helper function to extract values from malformed JSON
+const extractValue = (text, key) => {
+  const regex = new RegExp(`"${key}"\\s*:\\s*"([^"]*(?:\\\\.[^"]*)*)"`);
+  const match = text.match(regex);
+  return match ? match[1].replace(/\\"/g, '"') : null;
 };
 
 const isCodeRelatedTopic = (topic) => {
@@ -278,8 +316,8 @@ export const generateModuleContent = async (
         : "llama3-8b-8192"; // Use smaller model for non-technical content for efficiency
 
       const text = await llmCompletion(prompt, preferredModel);
-      const cleanedText = sanitizeJSON(text);
-      const content = JSON.parse(cleanedText);
+      const result = sanitizeJSON(text);
+      const content = typeof result === 'string' ? JSON5.parse(result) : result;
 
       if (!validateModuleContent(content)) {
         throw new Error("Invalid content structure from LLM");
@@ -356,14 +394,26 @@ export const generateFlashcards = async (topic, numCards = 5) => {
     const text = await llmCompletion(prompt, "llama3-8b-8192");
     
     try {
-      const cleanText = sanitizeJSON(text);
-      const flashcards = JSON.parse(cleanText);
+      const result = sanitizeJSON(text);
+      
+      // Check if sanitizeJSON returned an already parsed object
+      const flashcards = typeof result === 'string' ? JSON5.parse(result) : result;
 
-      if (!Array.isArray(flashcards) || flashcards.length !== numCards) {
+      if (!Array.isArray(flashcards) || flashcards.length === 0) {
         throw new Error("Invalid flashcard format");
       }
 
-      return flashcards;
+      // Normalize the flashcard count
+      const normalizedFlashcards = flashcards.slice(0, numCards);
+      while (normalizedFlashcards.length < numCards) {
+        normalizedFlashcards.push({
+          id: normalizedFlashcards.length + 1,
+          frontHTML: `Question about ${topic} ${normalizedFlashcards.length + 1}?`,
+          backHTML: `Answer about ${topic} ${normalizedFlashcards.length + 1}.`
+        });
+      }
+
+      return normalizedFlashcards;
     } catch (error) {
       console.error("Flashcard parsing error:", error);
       return Array.from({ length: numCards }, (_, i) => ({
@@ -461,7 +511,10 @@ export const generateQuizData = async (
       throw new Error("Invalid response format");
     }
 
-    const quizData = JSON.parse(jsonMatch[0]);
+    const result = sanitizeJSON(jsonMatch[0]);
+    
+    // Check if sanitizeJSON returned an already parsed object
+    const quizData = typeof result === 'string' ? JSON5.parse(result) : result;
 
     // Ensure the topic is properly set in the response
     if (
@@ -553,8 +606,10 @@ export const generateQuiz = async (moduleName, numQuestions) => {
     const text = await llmCompletion(prompt, "llama3-8b-8192");
 
     try {
-      const cleanText = sanitizeJSON(text);
-      const quizData = JSON.parse(cleanText);
+      const result = sanitizeJSON(text);
+      
+      // Check if sanitizeJSON returned an already parsed object
+      const quizData = typeof result === 'string' ? JSON5.parse(result) : result;
 
       if (
         !quizData.questions ||
@@ -682,7 +737,8 @@ export const generateLearningPath = async (
         const jsonMatch = text.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
           const jsonString = jsonMatch[0];
-          const modulesData = JSON.parse(jsonString);
+          const result = sanitizeJSON(jsonString);
+          const modulesData = typeof result === 'string' ? JSON5.parse(result) : result;
 
           // Validate and clean the data
           const cleanedModules = modulesData.map((module) => ({
@@ -698,7 +754,8 @@ export const generateLearningPath = async (
           throw new Error("Failed to parse JSON");
         }
       } else {
-        const modules = JSON.parse(cleanText);
+        const result = cleanText;
+        const modules = typeof result === 'string' ? JSON5.parse(result) : result;
         if (!Array.isArray(modules) || modules.length !== 5) {
           throw new Error("Invalid response format");
         }
@@ -875,8 +932,8 @@ export const generatePersonalizedCareerPaths = async (userData) => {
     const text = await Promise.race([resultPromise, timeoutPromise]);
 
     try {
-      const cleanText = sanitizeJSON(text);
-      const careerPaths = JSON.parse(cleanText);
+      const result = sanitizeJSON(text);
+      const careerPaths = typeof result === 'string' ? JSON5.parse(result) : result;
 
       if (!Array.isArray(careerPaths) || careerPaths.length === 0) {
         throw new Error("Invalid career paths format");
@@ -1320,7 +1377,10 @@ export const generateAINudges = async (
 
     // Nudges can use the smaller model as they're simpler content
     const response = await llmCompletion(prompt, "llama3-8b-8192");
-    return JSON.parse(sanitizeJSON(response));
+    const result = sanitizeJSON(response);
+    
+    // Check if sanitizeJSON returned an already parsed object
+    return typeof result === 'string' ? JSON5.parse(result) : result;
   } catch (error) {
     console.error("Error generating nudges:", error);
     return [
@@ -1349,7 +1409,7 @@ export const generateCareerSummary = async ({
   assessments,
 }) => {
   try {
-    const prompt = `You are PathGenie – an AI career coach and motivational mentor for students on their learning journey.
+    const prompt = `You are SkillCompass – an AI career coach and motivational mentor for students on their learning journey.
     
     Generate a detailed, emotionally supportive, and strategic career summary report for the following user based on their current learning progress, completed modules, quiz feedback, career goal, and interests.
     

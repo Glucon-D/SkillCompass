@@ -252,7 +252,7 @@ const Home = () => {
                     onClick={handleStartLearning}
                     className="group px-8 py-4 bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] text-white rounded-xl 
                     shadow-xl shadow-[#ff9d54]/20 hover:shadow-2xl hover:shadow-[#ff9d54]/30 
-                    transform hover:-translate-y-1 transition-all duration-200
+                    transform hover:-translate-y-1 transition-all duration-300 hover:scale-105
                     border border-white/10 backdrop-blur-sm flex items-center justify-center gap-2"
                   >
                     Start Learning Free
@@ -260,8 +260,8 @@ const Home = () => {
                   </button>
                   <button
                     className="px-8 py-4 bg-[#2a2a2a]/80 backdrop-blur-sm border border-[#3a3a3a] text-white 
-                    font-medium rounded-xl hover:bg-[#333333] hover:border-[#ff9d54] transform hover:-translate-y-1 
-                    transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                    font-medium rounded-xl hover:bg-[#1f1f1f] hover:border-[#ff9d54] transform hover:-translate-y-1 
+                    transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-lg flex items-center justify-center gap-2 hover:shadow-[#080808]"
                   >
                     See How It Works
                     <RiPlayCircleLine className="text-[#ff9d54] text-xl group-hover:scale-110 transition-transform" />
@@ -276,10 +276,10 @@ const Home = () => {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="order-1 lg:order-2 relative"
             >
-              <div className="relative z-10 rounded-3xl overflow-hidden shadow-2xl border border-[#3a3a3a] bg-[#1c1b1b]">
+              <div className="relative z-10 rounded-3xl overflow-hidden hover:shadow-2xl shadow-[#080808] border border-[#3a3a3a] hover:scale-105 duration-500">
                 <div className="absolute inset-0 bg-[#1c1b1b] z-0"></div>
                 <img
-                  className="w-full h-auto transform hover:scale-105 transition-transform duration-700 relative z-10"
+                  className="w-full h-auto transform  transition-transform duration-700 relative z-10"
                   src={IllustrationImage}
                   alt="AI Learning Illustration"
                 />
@@ -316,7 +316,7 @@ const Home = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.2 }}
-                className={`rounded-2xl p-6 md:p-8 transition-all hover:shadow-2xl shadow-md border ${feature.cardBg} border-[#3a3a3a] hover:border-[#ff9d54]`}
+                className={`rounded-2xl p-6 md:p-8 transition-all hover:shadow-xl shadow-[#ff9e5492] hover:scale-105 shadow-md border ${feature.cardBg} border-[#ff9d54] hover:bg-gradient-to-r from-[#ff9e5446] to-[#ff9e5446] duration-300`}
               >
                 <div
                   className={`w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-xl mx-auto mb-5 md:mb-6 ${feature.iconBg}`}
@@ -373,7 +373,7 @@ const Home = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.2 }}
-                className="bg-[#1c1b1b] p-5 md:p-6 rounded-2xl shadow-lg text-left border border-[#3a3a3a]"
+                className="bg-[#1c1b1b] p-5 md:p-6 rounded-2xl shadow-lg text-left border border-[#3a3a3a] hover:border-[#ff9d54] hover:scale-105 transition-all duration-300 hover:bg-[#252320]"
               >
                 <div className="flex items-center gap-3 md:gap-4 mb-3 md:mb-4">
                   <img
@@ -433,9 +433,9 @@ const Home = () => {
             onClick={handleStartLearning}
             className="px-6 md:px-8 py-3 md:py-4 bg-[#ff9d54] text-white rounded-lg shadow-lg shadow-[#ff9d54]/20 
               hover:bg-gradient-to-r hover:from-[#ff9d54] hover:to-[#ff8a30] 
-              hover:shadow-xl hover:shadow-[#ff9d54]/30 transition-all duration-100 
+              hover:shadow-xl hover:shadow-[#ff9d54]/30 transition-all duration-200 
               hover:backdrop-blur-sm border border-transparent hover:border-white/30 
-              hover:text-white/90 w-full sm:w-auto"
+              hover:text-white/90 w-full sm:w-auto hover:scale-105"
           >
             Start Learning Now 🚀
           </motion.button>
