@@ -10,6 +10,7 @@ import { useParams, useLocation } from "react-router-dom";
 import { saveQuizScore } from "../config/database";
 import { updatePoints } from "../config/database";
 import PointToast from "../components/PointToast";
+import { usePoints } from "../context/PointsContext";
 
 const Quiz = () => {
   const [topic, setTopic] = useState("");
@@ -32,6 +33,8 @@ const Quiz = () => {
   const [performanceNudges, setPerformanceNudges] = useState([]);
   const [showToast, setShowToast] = useState(false);
   const [pointsEarned, setPointsEarned] = useState(0);
+
+  const { setPoints } = usePoints();
 
   // Get parameters from URL if they exist
   const { pathId } = useParams();
@@ -464,8 +467,13 @@ const Quiz = () => {
       const numericAccuracy = parseFloat(calculatedAccuracy);
       const earned = numericAccuracy === 0 ? 10 : numericAccuracy;
 
+      // Update in Appwrite
       await updatePoints(user.$id, earned);
+
+      // Reflect in frontend instantly
+      setPoints((prev) => prev + earned);
       setPointsEarned(earned);
+      console.log("Points earned:", earned);
       setShowToast(true);
 
       await saveQuizScore({

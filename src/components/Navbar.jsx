@@ -10,14 +10,14 @@ import {
 } from "react-icons/ri"; // Added RiCoinFill for points
 import { differenceInDays, parseISO, format } from "date-fns";
 import { getStreakData } from "../config/database";
-import { getPoints } from "../config/database";
+import { usePoints } from "../context/PointsContext";
 
 const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const { user, loading, logout, isAuthenticated } = useAuth();
-  const [points, setPoints] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
+  const { points } = usePoints();
 
   // ✅ Function to calculate current streak
   const calculateCurrentStreak = (dates) => {
@@ -43,17 +43,6 @@ const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
 
     return streak;
   };
-
-  // ✅ Load user points
-  useEffect(() => {
-    if (!loading && user?.$id) {
-      const fetchPoints = async () => {
-        const currentPoints = await getPoints(user.$id);
-        setPoints(currentPoints);
-      };
-      fetchPoints();
-    }
-  }, [user, loading]);
 
   // ✅ Load user streak
   useEffect(() => {
@@ -171,7 +160,7 @@ const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className="flex items-center gap-1.5 md:gap-2 cursor-pointer"
-            onClick={() => navigate("/")}
+            onClick={() => navigate(isAuthenticated ? "/dashboard" : "/")}
           >
             <motion.div
               animate={{ rotate: [0, 10, -10, 0] }}
