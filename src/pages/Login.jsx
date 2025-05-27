@@ -196,7 +196,7 @@ const Login = () => {
             transition={{ delay: 0.3 }}
             className="text-2xl font-bold bg-gradient-to-r from-[#ff9d54] via-[#ff8a30] to-[#ff9d54] bg-clip-text text-transparent mb-2"
           >
-            {showForgotPassword ? 'Reset Your Password' : 'Sign In to PathGenie'}
+            {showForgotPassword ? 'Reset Your Password' : 'Sign In to SkillCompass'}
           </motion.h2>
 
           <motion.p

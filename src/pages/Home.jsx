@@ -402,7 +402,7 @@ const testimonials = [
     role: "Senior Software Engineer",
     company: "Google",
     avatar: "https://randomuser.me/api/portraits/women/44.jpg",
-    quote: "PathGenie's AI-driven approach revolutionized my learning journey. The personalized paths helped me master complex concepts faster than ever before.",
+    quote: "SkillCompass's AI-driven approach revolutionized my learning journey. The personalized paths helped me master complex concepts faster than ever before.",
     rating: 5,
   },
   {
@@ -425,20 +425,20 @@ const testimonials = [
 
 const faqs = [
   {
-    q: "How does PathGenie's AI personalization work?",
+    q: "How does SkillCompass's AI personalization work?",
     a: "Our advanced AI analyzes your learning patterns, performance metrics, and preferences to create a unique learning path. It continuously adapts based on your progress, ensuring optimal challenge levels and content delivery.",
   },
   {
-    q: "Is PathGenie suitable for complete beginners?",
+    q: "Is SkillCompass suitable for complete beginners?",
     a: "Absolutely! Our platform is designed for learners at all levels. The AI assessment identifies your current knowledge and creates a customized starting point, whether you're a complete beginner or looking to advance existing skills.",
   },
   {
-    q: "What makes PathGenie different from other learning platforms?",
-    a: "PathGenie combines cutting-edge AI technology with proven educational methodologies. Our unique features include real-time adaptation, interactive simulations, peer collaboration tools, and industry-recognized certifications.",
+    q: "What makes SkillCompass different from other learning platforms?",
+    a: "SkillCompass combines cutting-edge AI technology with proven educational methodologies. Our unique features include real-time adaptation, interactive simulations, peer collaboration tools, and industry-recognized certifications.",
   },
   {
     q: "Can I learn at my own pace?",
-    a: "Yes! PathGenie is completely self-paced. You can pause, resume, or revisit any content anytime. The AI adjusts to your schedule and learning speed, ensuring you never feel rushed or held back.",
+    a: "Yes! SkillCompass is completely self-paced. You can pause, resume, or revisit any content anytime. The AI adjusts to your schedule and learning speed, ensuring you never feel rushed or held back.",
   },
   {
     q: "What kind of support is available?",
@@ -734,7 +734,7 @@ const Home = () => {
               </span>
             </h2>
             <p className="text-base text-gray-300 max-w-2xl mx-auto">
-              Hear from professionals who transformed their careers with PathGenie
+              Hear from professionals who transformed their careers with SkillCompass
             </p>
           </motion.div>
 
@@ -817,7 +817,7 @@ const Home = () => {
               </span>
             </h2>
             <p className="text-base text-gray-300 max-w-2xl mx-auto">
-              Find answers to the most common questions about PathGenie
+              Find answers to the most common questions about SkillCompass
             </p>
           </motion.div>
 

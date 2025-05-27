@@ -153,7 +153,7 @@ const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
                 className="text-lg md:text-xl font-bold bg-gradient-to-r from-[#ff9d54] via-[#ff8a30] to-[#ff9d54]
                 bg-clip-text text-transparent bg-size-200 animate-gradient-x"
               >
-                PathGenie
+                SkillCompass
               </motion.span>
               <span className="text-xs text-gray-400 hidden md:block">AI Learning Platform</span>
             </div>

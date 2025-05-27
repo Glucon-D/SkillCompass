@@ -186,7 +186,7 @@ const Signup = () => {
             className="inline-flex items-center px-4 py-2 rounded-full bg-[#ff9d54]/10 border border-[#ff9d54]/20 text-[#ff9d54] text-sm font-medium mb-4"
           >
             <RiSparklingLine className="mr-2" />
-            Join PathGenie
+            Join SkillCompass
           </motion.div>
 
           <motion.h2
