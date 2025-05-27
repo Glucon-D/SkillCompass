@@ -315,13 +315,38 @@ const Flashcards = () => {
                 <span className="w-1 h-4 bg-[#ff9d54] rounded-full"></span>
                 Cards
               </label>
-              <input
-                type="text"
-                value={numCards}
-                onChange={(e) => setNumCards(Math.max(1, parseInt(e.target.value) || 1))}
-                min="1"
-                className="w-full px-4 py-3 rounded-xl bg-[#1c1b1b] border-2 border-[#3a3a3a] text-white focus:border-[#ff9d54] focus:ring-4 focus:ring-[#ff9d54]/20 transition-all outline-none"
-              />
+              <div className="relative flex items-center">
+                <button 
+                  onClick={() => setNumCards(prev => Math.max(1, prev - 1))}
+                  className="absolute left-0 w-10 h-full flex items-center justify-center text-white bg-[#3a3a3a] rounded-l-xl border-r border-[#1c1b1b] hover:bg-[#444] transition-colors"
+                >
+                  <span className="text-xl font-bold">−</span>
+                </button>
+                <input
+                  type="number"
+                  value={numCards}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    if (!isNaN(value) && value >= 1 && value <= 20) {
+                      setNumCards(value);
+                    } else if (e.target.value === '') {
+                      setNumCards(1);
+                    }
+                  }}
+                  min="1"
+                  max="20"
+                  className="w-full px-12 py-3 text-center rounded-xl bg-[#1c1b1b] border-2 border-[#3a3a3a] text-white focus:border-[#ff9d54] focus:ring-4 focus:ring-[#ff9d54]/20 transition-all outline-none"
+                />
+                <button 
+                  onClick={() => setNumCards(prev => Math.min(20, prev + 1))}
+                  className="absolute right-0 w-10 h-full flex items-center justify-center text-white bg-[#3a3a3a] rounded-r-xl border-l border-[#1c1b1b] hover:bg-[#444] transition-colors"
+                >
+                  <span className="text-xl font-bold">+</span>
+                </button>
+                <div className="absolute right-14 text-xs text-[#ff9d54]">
+                  1-20 cards
+                </div>
+              </div>
             </div>
 
             <div className="flex items-end">
