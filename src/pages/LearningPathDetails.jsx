@@ -23,6 +23,7 @@ import { useAuth } from "../context/AuthContext";
 import PointToast from "../components/PointToast";
 import { usePoints } from "../context/PointsContext";
 import { set } from "date-fns";
+import { useStreak } from "../context/StreakContext";
 
 // Add cache management at the top
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
@@ -82,7 +83,7 @@ const LearningPathDetails = () => {
   const [showToast, setShowToast] = useState(false);
   const [pointsEarned, setPointsEarned] = useState(0);
   const { setPoints } = usePoints();
-
+  const { refreshStreak } = useStreak();
   const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
   const CAREER_PATHS_COLLECTION_ID = import.meta.env
     .VITE_CAREER_PATHS_COLLECTION_ID;
@@ -223,6 +224,9 @@ const LearningPathDetails = () => {
         progress: newProgress,
         timestamp: updatedTimestamps,
       });
+
+      //Update user streak
+      refreshStreak();
 
       toast.success("Module marked as complete!");
 

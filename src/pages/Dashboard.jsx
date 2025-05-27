@@ -8,6 +8,40 @@ import { Query } from "appwrite";
 import { toast } from "react-hot-toast";
 import { generateAINudges } from "../config/llm";
 import NudgeCard from "../components/NudgeCard";
+import { useStreak } from "../context/StreakContext";
+
+const getAverageAccuracy = async (userId) => {
+  const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
+  const ASSESSMENTS_COLLECTION_ID = import.meta.env
+    .VITE_ASSESSMENTS_COLLECTION_ID;
+
+  try {
+    const res = await databases.listDocuments(
+      DATABASE_ID,
+      ASSESSMENTS_COLLECTION_ID,
+      [Query.equal("userID", userId)]
+    );
+
+    const assessments = res.documents || [];
+
+    const accuracies = assessments
+      .map((doc) => {
+        const match = doc.feedback?.match(/Accuracy:\s*([\d.]+)%/);
+        return match ? parseFloat(match[1]) : null;
+      })
+      .filter((a) => a !== null);
+
+    if (accuracies.length === 0) return 0;
+
+    const total = accuracies.reduce((sum, acc) => sum + acc, 0);
+    const average = total / accuracies.length;
+
+    return Number(average.toFixed(2));
+  } catch (error) {
+    console.error("❌ Failed to get average accuracy:", error);
+    return 0;
+  }
+};
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -15,7 +49,7 @@ const Dashboard = () => {
   const [paths, setPaths] = useState([]);
   const [flashcardCount, setFlashcardCount] = useState(0);
   const [quizScores, setQuizScores] = useState([]);
-  const [currentStreak, setCurrentStreak] = useState(0);
+  const { currentStreak } = useStreak();
   const [isLoading, setIsLoading] = useState(true);
   const [recentActivity, setRecentActivity] = useState([]);
   const [userStats, setUserStats] = useState({
@@ -24,6 +58,7 @@ const Dashboard = () => {
     avgQuizScore: 0,
   });
   const [aiNudges, setAiNudges] = useState([]);
+  const [averageAccuracy, setAverageAccuracy] = useState(null);
 
   // Get environment variables for Appwrite database and collections
   const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
@@ -50,6 +85,23 @@ const Dashboard = () => {
 
     fetchAllUserData();
   }, []);
+
+  useEffect(() => {
+    const fetchAccuracy = async () => {
+      if (!user?.$id) return;
+
+      try {
+        const avg = await getAverageAccuracy(user.$id);
+        console.log("Average Accuracy:", avg);
+        setAverageAccuracy(avg);
+      } catch (err) {
+        console.error("❌ Failed to fetch accuracy:", err);
+        setAverageAccuracy(0); // fallback
+      }
+    };
+
+    fetchAccuracy();
+  }, [user]);
 
   useEffect(() => {
     const fetchNudges = async () => {
@@ -163,34 +215,6 @@ const Dashboard = () => {
         avgQuizScore:
           totalQuizCount > 0 ? (totalQuizScore / totalQuizCount).toFixed(1) : 0,
       }));
-
-      // Calculate streak from quiz dates
-      if (quizScoresData.length > 0) {
-        const dates = quizScoresData.map((q) =>
-          new Date(q.date).toDateString()
-        );
-        const uniqueDates = [...new Set(dates)].sort(
-          (a, b) => new Date(b) - new Date(a)
-        );
-
-        let streak = 0;
-        const today = new Date().toDateString();
-        const yesterday = new Date(Date.now() - 86400000).toDateString();
-
-        if (uniqueDates[0] === today || uniqueDates[0] === yesterday) {
-          streak = 1;
-          for (let i = 1; i < uniqueDates.length; i++) {
-            const dateDiff = Math.round(
-              (new Date(uniqueDates[i - 1]) - new Date(uniqueDates[i])) /
-                86400000
-            );
-            if (dateDiff === 1) streak++;
-            else break;
-          }
-        }
-
-        setCurrentStreak(streak);
-      }
     } catch (error) {
       console.error("Error fetching user progress:", error);
       toast.error("Failed to load user progress");
@@ -312,7 +336,7 @@ const Dashboard = () => {
       icon: "📊",
       gradient: "from-[#ff9d54] to-[#ff8a30]",
       path: "/quiz",
-      stats: `${calculateSuccessRate()}% success rate`,
+      stats: `${averageAccuracy}% success rate`,
     },
   ];
 
@@ -384,12 +408,11 @@ const Dashboard = () => {
                   <div className="px-4 py-2 bg-[#3a3a3a] rounded-xl w-24 h-9 animate-pulse"></div>
                 ) : (
                   <div className="px-4 py-2 bg-[#3a3a3a] text-[#ff9d54] rounded-xl">
-                    Avg Quiz: {userStats.avgQuizScore}/10
+                    Avg Quiz: {averageAccuracy}%
                   </div>
                 )}
               </div>
             </motion.div>
-
             {/* Stats cards */}
             <div className="mt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               <div className="bg-[#2a2a2a] p-4 rounded-xl shadow-sm">
@@ -413,7 +436,7 @@ const Dashboard = () => {
               <div className="bg-[#2a2a2a] p-4 rounded-xl shadow-sm">
                 <p className="text-gray-400 text-sm">Success Rate</p>
                 <p className="text-2xl font-semibold text-white">
-                  {calculateSuccessRate()}%
+                  {averageAccuracy}%
                 </p>
               </div>
             </div>
@@ -456,43 +479,6 @@ const Dashboard = () => {
           </div>
         ) : (
           <>
-            {/* Enhanced Main Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {cards.map((card, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{
-                    scale: 1.02,
-                    boxShadow:
-                      "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
-                  }}
-                  onClick={() => navigate(card.path)}
-                  className="group relative overflow-hidden bg-[#2a2a2a]/70 backdrop-blur-sm p-6 rounded-2xl border border-[#3a3a3a] shadow transition-all duration-300 cursor-pointer"
-                >
-                  <div
-                    className={`absolute inset-0 bg-gradient-to-r ${card.gradient} opacity-0 group-hover:opacity-10 transition-opacity`}
-                  />
-                  <div className="relative space-y-4">
-                    <div className="text-4xl group-hover:scale-110 transition-transform">
-                      {card.icon}
-                    </div>
-                    <div className="space-y-2">
-                      <h2 className="text-xl font-semibold text-white">
-                        {card.title}
-                      </h2>
-                      <p className="text-gray-400">{card.description}</p>
-                    </div>
-                    <div className="inline-flex items-center gap-2 text-sm font-medium px-3 py-1 rounded-full bg-gradient-to-r from-[#3a3a3a] to-[#333333] text-[#ff9d54]">
-                      {card.stats}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-
             {/* Add nudges section */}
             {!isLoading && aiNudges.length > 0 && (
               <motion.div

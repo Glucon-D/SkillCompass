@@ -12,11 +12,14 @@ import { motion } from "framer-motion";
 import { getStreakData } from "../config/database";
 import { useAuth } from "../context/AuthContext";
 import CustomCalendar from "../components/CustomerCalendar";
+import { useStreak } from "../context/StreakContext";
 
 const QuizStreak = ({ quizScores }) => {
   const [quizDates, setQuizDates] = useState(new Set());
-  const [currentStreak, setCurrentStreak] = useState(0);
-  const [longestStreak, setLongestStreak] = useState(0);
+  // const [currentStreak, setCurrentStreak] = useState(0);
+  // const [longestStreak, setLongestStreak] = useState(0);
+  const { currentStreak, longestStreak } = useStreak();
+
   const { user } = useAuth();
   const [streakDates, setStreakDates] = useState(new Set());
 
@@ -29,60 +32,51 @@ const QuizStreak = ({ quizScores }) => {
     fetchStreak();
   }, [user]);
 
-  const calculateStreaks = (dates) => {
-    if (!dates || dates.length === 0) {
-      setCurrentStreak(0);
-      setLongestStreak(0);
-      return;
-    }
+  // const calculateStreaks = (dates) => {
+  //   if (!dates || dates.length === 0) {
+  //     setCurrentStreak(0);
+  //     setLongestStreak(0);
+  //     return;
+  //   }
 
-    // Sort and ensure unique dates
-    const sorted = [...new Set(dates)].sort();
-    const today = format(new Date(), "yyyy-MM-dd");
+  //   // Sort and ensure unique dates
+  //   const sorted = [...new Set(dates)].sort();
+  //   const today = format(new Date(), "yyyy-MM-dd");
 
-    let longest = 1;
-    let current = 0;
-    let temp = 1;
+  //   let longest = 1;
+  //   let current = 0;
+  //   let temp = 1;
 
-    for (let i = 1; i < sorted.length; i++) {
-      const prev = parseISO(sorted[i - 1]);
-      const curr = parseISO(sorted[i]);
-      const diff = differenceInDays(curr, prev);
+  //   for (let i = 1; i < sorted.length; i++) {
+  //     const prev = parseISO(sorted[i - 1]);
+  //     const curr = parseISO(sorted[i]);
+  //     const diff = differenceInDays(curr, prev);
 
-      if (diff === 1) {
-        temp++;
-      } else if (diff > 1) {
-        longest = Math.max(longest, temp);
-        temp = 1;
-      }
-    }
-    longest = Math.max(longest, temp); // final check
+  //     if (diff === 1) {
+  //       temp++;
+  //     } else if (diff > 1) {
+  //       longest = Math.max(longest, temp);
+  //       temp = 1;
+  //     }
+  //   }
+  //   longest = Math.max(longest, temp); // final check
 
-    // Calculate current streak ending at today
-    let currStreak = 0;
-    for (let i = sorted.length - 1; i >= 0; i--) {
-      const day = parseISO(sorted[i]);
-      const diff = differenceInDays(new Date(today), day);
+  //   // Calculate current streak ending at today
+  //   let currStreak = 0;
+  //   for (let i = sorted.length - 1; i >= 0; i--) {
+  //     const day = parseISO(sorted[i]);
+  //     const diff = differenceInDays(new Date(today), day);
 
-      if (diff === currStreak) {
-        currStreak++;
-      } else {
-        break;
-      }
-    }
+  //     if (diff === currStreak) {
+  //       currStreak++;
+  //     } else {
+  //       break;
+  //     }
+  //   }
 
-    setCurrentStreak(currStreak);
-    setLongestStreak(longest);
-  };
-
-  useEffect(() => {
-    if (streakDates && streakDates.length > 0) {
-      console.log("Streak Dates:", streakDates);
-      calculateStreaks(streakDates);
-    }
-  }, [streakDates]);
-
-  const today = new Date();
+  //   setCurrentStreak(currStreak);
+  //   setLongestStreak(longest);
+  // };
 
   return (
     <motion.div

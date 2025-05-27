@@ -11,6 +11,7 @@ import { saveQuizScore } from "../config/database";
 import { updatePoints } from "../config/database";
 import PointToast from "../components/PointToast";
 import { usePoints } from "../context/PointsContext";
+import { useStreak } from "../context/StreakContext";
 
 const Quiz = () => {
   const [topic, setTopic] = useState("");
@@ -33,7 +34,7 @@ const Quiz = () => {
   const [performanceNudges, setPerformanceNudges] = useState([]);
   const [showToast, setShowToast] = useState(false);
   const [pointsEarned, setPointsEarned] = useState(0);
-
+  const { refreshStreak } = useStreak();
   const { setPoints } = usePoints();
 
   // Get parameters from URL if they exist
@@ -488,6 +489,7 @@ const Quiz = () => {
         timestamp: new Date().toISOString(),
       });
 
+      refreshStreak();
       console.log("✅ Quiz score saved!");
     } catch (err) {
       console.error("❌ Error saving quiz result:", err);

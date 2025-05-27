@@ -12,6 +12,7 @@ import { Databases } from "appwrite";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useStreak } from "../context/StreakContext";
 import {
   RiBookOpenLine,
   RiCheckLine,
@@ -46,6 +47,7 @@ const ModuleDetails = () => {
   const [showToast, setShowToast] = useState(false);
   const [pointsEarned, setPointsEarned] = useState(0);
   const { setPoints } = usePoints();
+  const { refreshStreak } = useStreak();
 
   // New states for topic elaboration popup
   const [isPopupOpen, setIsPopupOpen] = useState(false);
@@ -188,6 +190,8 @@ const ModuleDetails = () => {
 
       // ✅ Optional: update local UI
       setIsCompleted(true);
+
+      refreshStreak();
 
       // ✅ Optional: show success or navigate back to LearningPath
       setTimeout(() => {

@@ -2,64 +2,19 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import {
-  RiFireFill,
-  RiCompassDiscoverFill,
-  RiCoinFill,
-  RiTrophyFill,
-} from "react-icons/ri"; // Changed RiMagicLine to RiCompassDiscoverFill
-import { differenceInDays, parseISO, format } from "date-fns";
-import { getStreakData } from "../config/database";
+
+import { RiFireFill, RiCompassDiscoverFill, RiCoinFill } from "react-icons/ri"; // Changed RiMagicLine to RiCompassDiscoverFill
+
 import { usePoints } from "../context/PointsContext";
+import { useStreak } from "../context/StreakContext";
 
 const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const { user, loading, logout, isAuthenticated } = useAuth();
-  const [currentStreak, setCurrentStreak] = useState(0);
+
   const { points } = usePoints();
-
-  // ✅ Function to calculate current streak
-  const calculateCurrentStreak = (dates) => {
-    if (!Array.isArray(dates) || dates.length === 0) return 0;
-
-    const today = format(new Date(), "yyyy-MM-dd"); // normalize to date only
-    const todayDate = parseISO(today);
-
-    const sorted = [...new Set(dates)].sort();
-
-    let streak = 0;
-
-    for (let i = sorted.length - 1; i >= 0; i--) {
-      const date = parseISO(sorted[i]);
-      const diff = differenceInDays(todayDate, date);
-
-      if (diff === streak) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-
-    return streak;
-  };
-
-  // ✅ Load user streak
-  useEffect(() => {
-    if (!loading && user?.$id) {
-      const fetchStreak = async () => {
-        try {
-          const streakDates = await getStreakData(user.$id);
-          const streak = calculateCurrentStreak(streakDates);
-          setCurrentStreak(streak);
-        } catch (err) {
-          console.error("Error fetching streak data:", err);
-          setCurrentStreak(0);
-        }
-      };
-      fetchStreak();
-    }
-  }, [user, loading]);
+  const { currentStreak } = useStreak();
 
   const handleLogin = () => navigate("/login");
   const handleSignup = () => navigate("/signup");
