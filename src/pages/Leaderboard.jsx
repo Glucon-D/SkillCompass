@@ -10,6 +10,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { databases } from "../config/database";
 import { usePoints } from "../context/PointsContext";
+import { Query } from "appwrite";
 
 const Leaderboard = () => {
   const { user } = useAuth();
@@ -29,7 +30,7 @@ const Leaderboard = () => {
         const res = await databases.listDocuments(
           import.meta.env.VITE_APPWRITE_DATABASE_ID,
           import.meta.env.VITE_USERS_COLLECTION_ID,
-          []
+          [Query.limit(100)] // 🚀 Fetch up to 100 users
         );
 
         const sorted = res.documents
