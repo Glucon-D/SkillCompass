@@ -124,13 +124,7 @@ const Flashcards = () => {
     try {
       const generatedCards = await generateFlashcards(topic, numCards);
       setCards(generatedCards);
-
-      if (user?.$id) {
-        await updateUserProgress(user.$id, {
-          topicName: topic,
-          flashcardCount: generatedCards.length, // Update with actual number of cards
-        });
-      }
+      
     } catch (err) {
       console.error("Error:", err);
       setError("Failed to load flashcards. Try again!");
