@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { account } from "../config/appwrite";
 import { databases } from "../config/database";
@@ -23,7 +23,8 @@ import {
   RiCloseLine
 } from 'react-icons/ri';
 import { generateAINudges } from "../config/llm";
-import NudgeCard from "../components/NudgeCard";
+// Lazy load the NudgeCard component
+const NudgeCard = lazy(() => import("../components/NudgeCard"));
 import { toast } from 'react-hot-toast';
 
 const LearningPath = () => {
@@ -56,41 +57,25 @@ const LearningPath = () => {
 
   // Enhanced function with less strict validation and better debugging
   const processCareerPaths = (paths, userCareerGoal, userInterests) => {
-    console.log("Processing paths:", paths);
-    console.log("User career goal:", userCareerGoal);
+    if (!paths || paths.length === 0) return [];
     
-    // First create a map of normalized names to find potential duplicates
+    // Create a map of normalized names to find potential duplicates
     const nameMap = new Map();
-    const filteredOutPaths = []; // For debugging
     
     // Normalize the user's career goal for comparison
     const normalizedCareerGoal = userCareerGoal ? normalizeCareerName(userCareerGoal) : '';
     
-    paths.forEach(path => {
-      // Debug info
-      console.log("Evaluating path:", path.careerName, "modules:", path.modules?.length || 0);
-      
-      if (!path.careerName) {
-        filteredOutPaths.push({ path, reason: "Missing career name" });
-        return; // Skip paths without name
-      }
+    for (const path of paths) {
+      if (!path.careerName) continue;
       
       const normalizedName = normalizeCareerName(path.careerName);
       
       // Skip paths that match the user's career goal
-      if (normalizedCareerGoal && normalizedName === normalizedCareerGoal) {
-        filteredOutPaths.push({ path: path.careerName, reason: "Matches career goal" });
-        return;
-      }
+      if (normalizedCareerGoal && normalizedName === normalizedCareerGoal) continue;
 
-      // More permissive module validation
       // Check if this path has any modules at all
       const hasModules = Array.isArray(path.modules) && path.modules.length > 0;
-      
-      if (!hasModules) {
-        filteredOutPaths.push({ path: path.careerName, reason: "No modules" });
-        return; // Skip paths without modules
-      }
+      if (!hasModules) continue;
       
       if (nameMap.has(normalizedName)) {
         // If this is a duplicate, keep the one that's more complete
@@ -100,17 +85,12 @@ const LearningPath = () => {
             path.progress > existing.progress) {
           nameMap.set(normalizedName, path);
         }
-        filteredOutPaths.push({ path: path.careerName, reason: "Duplicate (kept better version)" });
       } else {
         nameMap.set(normalizedName, path);
       }
-    });
+    }
     
-    // Log debugging info
-    console.log("Filtered out paths:", filteredOutPaths);
-    console.log("Kept paths:", Array.from(nameMap.values()).map(p => p.careerName));
-    
-    // Return only unique interest-based paths
+    // Return only unique paths
     return Array.from(nameMap.values());
   };
 
@@ -124,12 +104,19 @@ const LearningPath = () => {
       const user = await account.get();
       console.log("Current user:", user.$id);
       
-      // First fetch user profile to get career goal and interests
-      const profileResponse = await databases.listDocuments(
-        DATABASE_ID,
-        USERS_COLLECTION_ID,
-        [Query.equal("userID", user.$id)]
-      );
+      // Use Promise.all to fetch user profile and paths in parallel
+      const [profileResponse, pathsResponse] = await Promise.all([
+        databases.listDocuments(
+          DATABASE_ID,
+          USERS_COLLECTION_ID,
+          [Query.equal("userID", user.$id)]
+        ),
+        databases.listDocuments(
+          DATABASE_ID,
+          CAREER_PATHS_COLLECTION_ID,
+          [Query.equal("userID", user.$id)]
+        )
+      ]);
       
       let userCareerGoal = '';
       let userInterests = [];
@@ -144,15 +131,6 @@ const LearningPath = () => {
         console.log("No user profile found");
       }
       
-      // Then fetch career paths
-      const pathsResponse = await databases.listDocuments(
-        DATABASE_ID,
-        CAREER_PATHS_COLLECTION_ID,
-        [Query.equal("userID", user.$id)]
-      );
-
-      console.log("Raw paths from database:", pathsResponse.documents);
-
       // Parse JSON fields for each career path with better error handling
       const parsedPaths = pathsResponse.documents.map(path => {
         try {
@@ -173,39 +151,49 @@ const LearningPath = () => {
         }
       });
       
-      console.log("Parsed paths:", parsedPaths);
-      
       // Process paths with less filtering
       const processedPaths = processCareerPaths(parsedPaths, userCareerGoal, userInterests);
       
       setCareerPaths(processedPaths);
       setError("");
       
-      // Generate nudges based on the paths
-      await generatePathNudges(processedPaths);
+      // Only generate nudges if needed and not on initial load
+      if (processedPaths.length > 0 && !sessionStorage.getItem('nudgesGenerated')) {
+        sessionStorage.setItem('nudgesGenerated', 'true');
+        // Use the first path's existing nudges if available instead of generating new ones
+        if (processedPaths[0].aiNudges && processedPaths[0].aiNudges.length > 0) {
+          setPathNudges(processedPaths[0].aiNudges.slice(0, 3));
+        } else {
+          // Generate nudges as a non-blocking operation
+          generatePathNudges(processedPaths).catch(console.error);
+        }
+      }
       
     } catch (error) {
       console.error("Error fetching data:", error);
-      setError("Failed to load AI-generated learning paths. Please try again later.");
+      setError("Failed to load learning paths. Please try again later.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Define the generatePathNudges function before it's used
+  // Optimize the generatePathNudges function
   const generatePathNudges = async (paths) => {
-    if (paths.length > 0) {
-      try {
-        const userData = await account.get();
+    if (paths.length === 0) return;
+    
+    try {
+      const userData = await account.get();
+      // Use a timeout to make this non-blocking
+      setTimeout(async () => {
         const nudges = await generateAINudges(
           userData,
           [], // No assessment data needed for path-specific nudges
           paths[0]
         );
         setPathNudges(nudges);
-      } catch (error) {
-        console.error("Error generating path nudges:", error);
-      }
+      }, 100);
+    } catch (error) {
+      console.error("Error generating path nudges:", error);
     }
   };
 
@@ -259,23 +247,26 @@ const LearningPath = () => {
     return <RiCodeSSlashLine className="w-6 h-6 text-blue-500" />; // default icon
   };
 
-  // Filter career paths based on search term
-  const filteredCareerPaths = careerPaths.filter(path => 
-    path.careerName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter career paths based on search term - memoized to avoid recalculating on every render
+  const filteredCareerPaths = useMemo(() => {
+    return careerPaths.filter(path => 
+      path.careerName?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [careerPaths, searchTerm]);
 
-  const container = {
+  // Memoize animations to prevent unnecessary recalculations
+  const container = useMemo(() => ({
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
       transition: { staggerChildren: 0.1 },
     },
-  };
+  }), []);
 
-  const item = {
+  const item = useMemo(() => ({
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0 },
-  };
+  }), []);
 
   // Check if there are any career paths for the current user on initial load
   useEffect(() => {
@@ -284,13 +275,20 @@ const LearningPath = () => {
     }
   }, [careerPaths, loading, error]);
 
+  // Add a simple loading fallback for lazy-loaded components
+  const LoadingFallback = () => (
+    <div className="bg-[#2a2a2a]/70 backdrop-blur-sm p-4 rounded-xl border border-[#3a3a3a] animate-pulse">
+      <div className="h-24 w-full"></div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen rounded-2xl bg-gradient-to-br from-[#1c1b1b] to-[#252525] p-6 relative overflow-hidden">
-      {/* Animated Background Blobs */}
+      {/* Animated Background Blobs - simplified for performance */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 -left-4 w-96 h-96 bg-[#ff9d54] rounded-full mix-blend-multiply filter blur-3xl opacity-5 animate-blob"></div>
-        <div className="absolute top-40 -right-4 w-96 h-96 bg-[#ff8a30] rounded-full mix-blend-multiply filter blur-3xl opacity-5 animate-blob animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-20 w-96 h-96 bg-[#ff9d54] rounded-full mix-blend-multiply filter blur-3xl opacity-5 animate-blob animation-delay-4000"></div>
+        <div className="absolute top-0 -left-4 w-96 h-96 bg-[#ff9d54] rounded-full mix-blend-multiply filter blur-3xl opacity-5"></div>
+        <div className="absolute top-40 -right-4 w-96 h-96 bg-[#ff8a30] rounded-full mix-blend-multiply filter blur-3xl opacity-5"></div>
+        <div className="absolute -bottom-8 left-20 w-96 h-96 bg-[#ff9d54] rounded-full mix-blend-multiply filter blur-3xl opacity-5"></div>
       </div>
 
       {/* Delete Confirmation Modal */}
@@ -453,7 +451,7 @@ const LearningPath = () => {
           </motion.div>
         )}
 
-        {/* AI-Generated Learning Paths Grid */}
+        {/* AI-Generated Learning Paths Grid - Optimized rendering */}
         {!loading && !error && filteredCareerPaths.length > 0 && (
           <motion.div
             variants={item}
@@ -461,10 +459,11 @@ const LearningPath = () => {
           >
             {filteredCareerPaths.map((path, index) => (
               <motion.div
-                key={index}
+                key={path.$id || index}
                 whileHover={{ y: -8, scale: 1.02 }}
                 transition={{ type: "spring", stiffness: 300 }}
                 className="group relative bg-[#2a2a2a]/70 backdrop-blur-sm p-6 rounded-2xl border border-[#3a3a3a] shadow-lg hover:shadow-xl overflow-hidden"
+                onClick={() => navigate(`/learning-path/${path.$id}`)}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-[#ff9d54]/10 to-[#ff8a30]/10 opacity-0 group-hover:opacity-50 transition-opacity duration-300" />
                 
@@ -490,10 +489,7 @@ const LearningPath = () => {
                 </div>
                 
                 {/* Path content section */}
-                <div 
-                  className="relative space-y-4"
-                  onClick={() => navigate(`/learning-path/${path.$id}`)}
-                >
+                <div className="relative space-y-4">
                   <div className="space-y-2">
                     <div className="w-12 h-12 bg-gradient-to-br from-[#3a3a3a] to-[#444444] rounded-xl flex items-center justify-center transform transition-transform group-hover:scale-110">
                       {getCareerIcon(path.careerName)}
@@ -509,24 +505,16 @@ const LearningPath = () => {
 
                   <div className="space-y-3">
                     <div className="w-full bg-[#3a3a3a] rounded-full h-2">
-                      <motion.div
+                      <div
                         className="bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] h-2 rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${path.progress}%` }}
-                        transition={{ duration: 1, ease: "easeOut" }}
+                        style={{ width: `${path.progress || 0}%` }}
                       />
                     </div>
                     <div className="flex justify-between items-center">
                       <p className="text-[#ff9d54] font-medium text-sm">
-                        {path.progress}% Complete
+                        {path.progress || 0}% Complete
                       </p>
-                      <motion.span
-                        className="text-[#ff9d54]"
-                        animate={{ x: [0, 4, 0] }}
-                        transition={{ repeat: Infinity, duration: 1.5 }}
-                      >
-                        →
-                      </motion.span>
+                      <span className="text-[#ff9d54]">→</span>
                     </div>
                   </div>
                 </div>
@@ -552,12 +540,13 @@ const LearningPath = () => {
             <h2 className="text-xl font-semibold mb-4 text-white">AI Learning Nudges</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {careerPaths[0].aiNudges.slice(0, 2).map((nudge, index) => (
-                <NudgeCard 
-                  key={index}
-                  title={nudge.title || "Learning Recommendation"}
-                  content={nudge.content}
-                  type={nudge.type || "tip"}
-                />
+                <Suspense key={index} fallback={<LoadingFallback />}>
+                  <NudgeCard 
+                    title={nudge.title || "Learning Recommendation"}
+                    content={nudge.content}
+                    type={nudge.type || "tip"}
+                  />
+                </Suspense>
               ))}
             </div>
           </motion.div>
@@ -570,13 +559,15 @@ const LearningPath = () => {
             className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4"
           >
             {pathNudges.map((nudge, index) => (
-              <NudgeCard
-                key={index}
-                text={nudge.text}
-                type={nudge.type}
-                icon={nudge.icon}
-                elevated={true}
-              />
+              <Suspense key={index} fallback={<LoadingFallback />}>
+                <NudgeCard
+                  key={index}
+                  text={nudge.text}
+                  type={nudge.type}
+                  icon={nudge.icon}
+                  elevated={true}
+                />
+              </Suspense>
             ))}
           </motion.div>
         )}

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { RiArrowRightLine, RiDownloadLine, RiUserStarLine, RiCheckboxCircleFill } from 'react-icons/ri';
+import { RiArrowRightLine, RiDownloadLine, RiUserStarLine, RiCheckboxCircleFill, RiRefreshLine } from 'react-icons/ri';
 import { PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { account } from "../config/appwrite";
 import { databases } from "../config/database";
@@ -25,14 +25,18 @@ const COLORS = ['#3b82f6', '#e5e7eb'];
 const CareerSummary = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [careerPaths, setCareerPaths] = useState([]);
   const [careerSummaries, setCareerSummaries] = useState([]);
+  const [userData, setUserData] = useState(null);
+  const [assessments, setAssessments] = useState([]);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
   const refs = useRef([]);
 
   useEffect(() => {
-    fetchAllCareerSummaries();
+    fetchUserDataAndPaths();
   }, []);
 
-  const fetchAllCareerSummaries = async () => {
+  const fetchUserDataAndPaths = async () => {
     try {
       setLoading(true);
       const user = await account.get();
@@ -44,7 +48,7 @@ const CareerSummary = () => {
       ]);
 
       const userDoc = userRes.documents[0];
-      const assessments = assessmentsRes.documents.map((a) => ({
+      const assessmentData = assessmentsRes.documents.map((a) => ({
         moduleID: a.moduleID,
         moduleName: a.moduleName || `Module ${a.moduleID}`,
         score: a.score,
@@ -82,10 +86,31 @@ const CareerSummary = () => {
       });
 
       const keptPaths = Array.from(nameMap.values());
+      
+      setUserData(parsedUser);
+      setAssessments(assessmentData);
+      setCareerPaths(keptPaths);
+    } catch (err) {
+      toast.error("Failed to load career paths");
+      console.error("Error fetching data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      const allSummaries = await Promise.all(keptPaths.map(async (career, idx) => {
+  const generateSummaries = async () => {
+    if (!userData || careerPaths.length === 0) {
+      toast.error("No career paths available to generate summaries");
+      return;
+    }
+
+    try {
+      setGeneratingSummary(true);
+      toast.loading("Generating career summaries...");
+
+      const allSummaries = await Promise.all(careerPaths.map(async (career) => {
         const summary = await generateCareerSummary({
-          user: parsedUser,
+          user: userData,
           careerPath: career,
           assessments
         });
@@ -93,7 +118,7 @@ const CareerSummary = () => {
         return {
           ref: React.createRef(),
           data: {
-            name: parsedUser.name,
+            name: userData.name,
             goal: career.careerName,
             progress: career.progress,
             completed: career.completedModules.length,
@@ -105,11 +130,14 @@ const CareerSummary = () => {
 
       refs.current = allSummaries.map((s) => s.ref);
       setCareerSummaries(allSummaries);
+      toast.dismiss();
+      toast.success("Summaries generated successfully!");
     } catch (err) {
-      toast.error("Failed to load summaries");
-      console.error("Error fetching summaries:", err);
+      toast.dismiss();
+      toast.error("Failed to generate summaries");
+      console.error("Error generating summaries:", err);
     } finally {
-      setLoading(false);
+      setGeneratingSummary(false);
     }
   };
 
@@ -133,11 +161,58 @@ const CareerSummary = () => {
   };
 
   if (loading) {
-    return <div className="h-screen flex items-center justify-center text-[#ff9d54] bg-[#1c1b1b]">Generating career summaries...</div>;
+    return <div className="h-screen flex items-center justify-center text-[#ff9d54] bg-[#1c1b1b]">Loading career paths...</div>;
   }
 
   return (
     <div className="md:p-6 min-h-screen bg-gradient-to-br from-[#1c1b1b] to-[#252525] space-y-10">
+      {/* Generate Summary Button */}
+      {careerSummaries.length === 0 && (
+        <motion.div
+          className="max-w-xl mx-auto bg-[#2a2a2a]/70 backdrop-blur-sm rounded-xl shadow-xl p-6 border border-[#3a3a3a] text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h1 className="text-2xl font-bold text-[#ff9d54] mb-4">Career Summary</h1>
+          <p className="text-gray-300 mb-6">
+            Generate detailed summaries of your progress in each career path. 
+            This may take a moment as our AI analyzes your learning journey.
+          </p>
+          <button
+            onClick={generateSummaries}
+            disabled={generatingSummary || careerPaths.length === 0}
+            className={`px-6 py-3 bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] text-white rounded-lg flex items-center gap-2 mx-auto ${
+              generatingSummary || careerPaths.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:from-[#ff8a30] hover:to-[#ff9d54]'
+            }`}
+          >
+            {generatingSummary ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Generating Summaries...
+              </>
+            ) : (
+              <>
+                <RiRefreshLine className="text-xl" /> Generate Career Summaries
+              </>
+            )}
+          </button>
+          {careerPaths.length === 0 && !loading && (
+            <p className="text-red-400 mt-4">
+              No career paths found. Please create learning paths first.
+            </p>
+          )}
+          <div className="mt-6">
+            <button
+              className="px-5 py-2 bg-[#3a3a3a] text-[#ff9d54] rounded-lg flex gap-2 items-center hover:bg-[#444] transition-colors mx-auto"
+              onClick={() => navigate("/dashboard")}
+            >
+              <RiArrowRightLine className="rotate-180" /> Back to Dashboard
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Career Summaries */}
       {careerSummaries.map((summary, index) => {
         const pieData = [
           { name: 'Completed', value: summary.data.completed },
@@ -164,49 +239,119 @@ const CareerSummary = () => {
             {/* PDF Content */}
             <div
               ref={summary.ref}
-              className="summary-container bg-white text-black p-6 rounded-lg"
+              className="summary-container bg-gradient-to-br from-[#1c1b1b] to-[#252525] text-white p-8 rounded-xl border border-[#3a3a3a] shadow-lg"
             >
-              <h2 className="text-xl font-bold mb-2">Career Summary Report for {summary.data.name}</h2>
-              <p className="mb-1"><span className="font-bold">Career Goal:</span> {summary.data.goal}</p>
-              <p className="mb-1"><span className="font-bold">Modules Completed:</span> {summary.data.completed}/{summary.data.total}</p>
-              <p className="mb-1"><span className="font-bold">Overall Progress:</span> {summary.data.progress}%</p>
-              <hr className="my-3" />
-              <div className="flex flex-col items-center justify-center mt-6 mb-4">
-                <div style={{ width: '200px', height: '200px' }}>
-                  <PieChart width={200} height={200}>
-                    <Pie data={pieData} dataKey="value" cx="50%" cy="50%" outerRadius={60} label>
-                      {pieData.map((entry, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-gradient-to-br from-[#ff9d54] to-[#ff8a30] rounded-lg flex items-center justify-center">
+                  <RiUserStarLine className="text-white text-xl" />
                 </div>
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] bg-clip-text text-transparent">
+                  Career Summary Report for {summary.data.name}
+                </h2>
+              </div>
 
-                <div style={{ marginTop: '10px', textAlign: 'center', fontSize: '14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <div style={{ width: '15px', height: '15px', backgroundColor: COLORS[0], borderRadius: '3px' }}></div>
-                    <span><strong>Completed Modules</strong></span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="bg-[#2a2a2a]/70 p-4 rounded-lg border border-[#3a3a3a]">
+                  <p className="text-gray-400 text-sm">Career Goal</p>
+                  <p className="text-white font-semibold">{summary.data.goal}</p>
+                </div>
+                <div className="bg-[#2a2a2a]/70 p-4 rounded-lg border border-[#3a3a3a]">
+                  <p className="text-gray-400 text-sm">Modules Completed</p>
+                  <p className="text-white font-semibold">{summary.data.completed}/{summary.data.total}</p>
+                </div>
+                <div className="bg-[#2a2a2a]/70 p-4 rounded-lg border border-[#3a3a3a]">
+                  <p className="text-gray-400 text-sm">Overall Progress</p>
+                  <p className="text-white font-semibold">{summary.data.progress}%</p>
+                </div>
+              </div>
+
+              <div className="bg-[#2a2a2a]/70 p-6 rounded-xl border border-[#3a3a3a] mb-6">
+                <div className="flex flex-col md:flex-row items-center justify-between">
+                  <div className="w-full md:w-1/2 flex flex-col items-center mb-4 md:mb-0">
+                    <div style={{ width: '200px', height: '200px' }}>
+                      <PieChart width={200} height={200}>
+                        <Pie 
+                          data={pieData} 
+                          dataKey="value" 
+                          cx="50%" 
+                          cy="50%" 
+                          outerRadius={80}
+                          innerRadius={40}
+                          paddingAngle={2}
+                          label
+                        >
+                          {pieData.map((entry, i) => (
+                            <Cell 
+                              key={i} 
+                              fill={i === 0 ? '#ff9d54' : '#3a3a3a'} 
+                              stroke={i === 0 ? '#ff8a30' : '#444444'} 
+                              strokeWidth={1}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={{ backgroundColor: '#2a2a2a', borderColor: '#3a3a3a', color: 'white' }} />
+                      </PieChart>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '15px', height: '15px', backgroundColor: COLORS[1], borderRadius: '3px' }}></div>
-                    <span><strong>Remaining Modules</strong></span>
+
+                  <div className="w-full md:w-1/2">
+                    <h3 className="text-xl font-semibold text-[#ff9d54] mb-4">Learning Progress</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-gray-300 text-sm">Completed Modules</span>
+                          <span className="text-[#ff9d54] font-medium">{summary.data.completed}</span>
+                        </div>
+                        <div className="w-full bg-[#3a3a3a] rounded-full h-2">
+                          <div 
+                            className="bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] h-2 rounded-full"
+                            style={{ width: `${summary.data.progress}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-gray-300 text-sm">Remaining Modules</span>
+                          <span className="text-gray-400 font-medium">{summary.data.total - summary.data.completed}</span>
+                        </div>
+                        <div className="w-full bg-[#3a3a3a] rounded-full h-2">
+                          <div 
+                            className="bg-[#444444] h-2 rounded-full"
+                            style={{ width: `${100 - summary.data.progress}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4 mt-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-sm bg-gradient-to-r from-[#ff9d54] to-[#ff8a30]"></div>
+                          <span className="text-xs text-gray-300">Completed</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-sm bg-[#3a3a3a]"></div>
+                          <span className="text-xs text-gray-300">Remaining</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
+              <div className="bg-[#2a2a2a]/70 p-6 rounded-xl border border-[#3a3a3a]">
+                <h3 className="text-xl font-semibold text-[#ff9d54] mb-4">AI Career Analysis</h3>
+                <div className="space-y-4 text-gray-300">
+                  {summary.summaryText.split("\n\n").map((block, idx) => {
+                    const formatted = block
+                      .replace(/\*\*(.*?)\*\*/g, "<span class='text-[#ff9d54] font-semibold'>$1</span>")
+                      .replace(/\n/g, "<br/>");
 
-
-              <hr style={{ margin: "15px 0" }} />
-              {summary.summaryText.split("\n\n").map((block, idx) => {
-                const formatted = block
-                  .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")  // Bold from **text**
-                  .replace(/\n/g, "<br/>");
-
-                return (
-                  <div key={idx} className="mb-3 text-black" dangerouslySetInnerHTML={{ __html: formatted }} />
-                );
-              })}
+                    return (
+                      <div key={idx} className="mb-3" dangerouslySetInnerHTML={{ __html: formatted }} />
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-4 pt-4 justify-center">
@@ -226,6 +371,30 @@ const CareerSummary = () => {
           </motion.div>
         );
       })}
+
+      {/* Generate More Button */}
+      {careerSummaries.length > 0 && (
+        <div className="flex justify-center pb-10">
+          <button
+            onClick={generateSummaries}
+            disabled={generatingSummary}
+            className={`px-5 py-2 bg-[#3a3a3a] text-[#ff9d54] rounded-lg flex gap-2 items-center hover:bg-[#444] transition-colors ${
+              generatingSummary ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+          >
+            {generatingSummary ? (
+              <>
+                <div className="w-4 h-4 border-2 border-[#ff9d54] border-t-transparent rounded-full animate-spin"></div>
+                Regenerating...
+              </>
+            ) : (
+              <>
+                <RiRefreshLine /> Regenerate Summaries
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
