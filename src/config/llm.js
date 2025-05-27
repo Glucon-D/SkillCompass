@@ -1349,7 +1349,7 @@ export const generateCareerSummary = async ({
   assessments,
 }) => {
   try {
-    const prompt = `You are PathGenie – an AI career coach and motivational mentor for students on their learning journey.
+    const prompt = `You are SkillCompass – an AI career coach and motivational mentor for students on their learning journey.
     
     Generate a detailed, emotionally supportive, and strategic career summary report for the following user based on their current learning progress, completed modules, quiz feedback, career goal, and interests.
     

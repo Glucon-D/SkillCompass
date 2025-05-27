@@ -4,10 +4,10 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   RiFireFill,
-  RiMagicLine,
+  RiCompassDiscoverFill,
   RiCoinFill,
   RiTrophyFill,
-} from "react-icons/ri"; // Added RiCoinFill for points
+} from "react-icons/ri"; // Changed RiMagicLine to RiCompassDiscoverFill
 import { differenceInDays, parseISO, format } from "date-fns";
 import { getStreakData } from "../config/database";
 import { usePoints } from "../context/PointsContext";
@@ -168,13 +168,13 @@ const Navbar = ({ isDashboard, isSidebarOpen, setIsSidebarOpen }) => {
               className="w-7 h-7 md:w-8 md:h-8 bg-gradient-to-tr from-[#ff9d54] to-[#ff8a30] rounded-lg 
                 flex items-center justify-center"
             >
-              <RiMagicLine className="text-white text-lg md:text-xl" />
+              <RiCompassDiscoverFill className="text-white text-lg md:text-xl" />
             </motion.div>
             <span
               className="text-lg md:text-xl font-serif font-bold bg-gradient-to-r from-[#ff9d54] 
               to-[#ff8a30] bg-clip-text text-transparent truncate"
             >
-              PathGenie
+              SkillCompass
             </span>
           </motion.div>
         </div>

@@ -138,7 +138,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
               </motion.span>
             </div>
             <span className="text-xl font-bold bg-gradient-to-r from-[#ff9d54] to-[#ff8a30] bg-clip-text text-transparent">
-              pathgenie
+              SkillCompass
             </span>
           </motion.div>
 
