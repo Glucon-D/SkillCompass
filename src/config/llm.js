@@ -1,21 +1,145 @@
 import axios from "axios";
 import JSON5 from "json5";
 
+// Debugging flag - set to true to enable verbose logging
+const DEBUG_MODE = true;
+
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-// List of GROQ models in order of preference
+// Helper function for consistent debug logging
+const debugLog = (message, data = null) => {
+  if (!DEBUG_MODE) return;
+  
+  const timestamp = new Date().toISOString();
+  if (data) {
+    console.log(`[${timestamp}] ${message}`, data);
+  } else {
+    console.log(`[${timestamp}] ${message}`);
+  }
+};
+
+// Log API requests for debugging
+const logApiRequest = (model, success = true, error = null) => {
+  if (!DEBUG_MODE) return;
+  
+  const requestLog = {
+    timestamp: new Date().toISOString(),
+    model,
+    success,
+    error: error ? {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data
+    } : null
+  };
+  
+  debugLog(`API Request: ${model} - ${success ? 'SUCCESS' : 'FAILED'}`, requestLog);
+};
+
+// Updated list of GROQ models in order of preference with newer models
 const GROQ_MODELS = [
-  "llama3-70b-8192", // Primary model - most capable
-  "llama3-8b-8192", // First fallback - good balance of speed and quality
-  "llama-3.1-8b-instant", // Second fallback - different architecture
-  "gemma2-9b-it", // Third fallback - different model family
+  "llama-3.3-70b-versatile", // Latest high-performance model with 128K context
+  "llama3-70b-8192", // Fallback to previous generation
+  "llama-3.1-8b-instant", // Fast response model
+  "llama3-8b-8192", // Smaller model for efficiency
+  "gemma2-9b-it", // Different model family as fallback
+  "meta-llama/llama-4-maverick-17b-128e-instruct", // Preview model for advanced features
+  "qwen-qwq-32b", // Alternative model architecture
 ];
 
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 1000; // 1 second
+// Model capabilities and use cases - for automatic selection
+const MODEL_CAPABILITIES = {
+  "llama-3.3-70b-versatile": {
+    contextWindow: 128000,
+    capability: "high",
+    speed: "fast",
+    useCase: ["complex", "technical", "creative", "detailed"]
+  },
+  "llama3-70b-8192": {
+    contextWindow: 8192,
+    capability: "high",
+    speed: "medium",
+    useCase: ["complex", "technical", "detailed"]
+  },
+  "llama-3.1-8b-instant": {
+    contextWindow: 128000,
+    capability: "medium",
+    speed: "very-fast",
+    useCase: ["simple", "interactive", "chat"]
+  },
+  "llama3-8b-8192": {
+    contextWindow: 8192,
+    capability: "medium",
+    speed: "fast",
+    useCase: ["general", "simple"]
+  },
+  "gemma2-9b-it": {
+    contextWindow: 8192,
+    capability: "medium",
+    speed: "fast",
+    useCase: ["general", "alternative"]
+  },
+  "meta-llama/llama-4-maverick-17b-128e-instruct": {
+    contextWindow: 131072,
+    capability: "high",
+    speed: "medium",
+    useCase: ["complex", "long-context"]
+  },
+  "qwen-qwq-32b": {
+    contextWindow: 128000,
+    capability: "high",
+    speed: "medium",
+    useCase: ["alternative", "fallback"]
+  },
+};
+
+// Enhanced retry and backoff strategy
+const MAX_RETRIES = 5; // Increased from 3
+const BASE_RETRY_DELAY = 1000; // 1 second
+const MAX_RETRY_DELAY = 15000; // Maximum 15 seconds
+const RATE_LIMIT_STATUS_CODES = [429, 500, 502, 503, 504];
+
+// Track API usage to prevent rate limit issues
+let apiRequestLog = {
+  timestamp: Date.now(),
+  count: 0,
+  resetInterval: 60000, // 1 minute
+  maxRequestsPerInterval: 25, // Adjust based on actual rate limits
+};
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Reset request counter periodically
+setInterval(() => {
+  apiRequestLog = {
+    ...apiRequestLog,
+    timestamp: Date.now(),
+    count: 0
+  };
+}, apiRequestLog.resetInterval);
+
+// Check if we're approaching rate limits
+const shouldThrottle = () => {
+  const now = Date.now();
+  const elapsed = now - apiRequestLog.timestamp;
+  
+  // If we're still in the same interval and approaching limit
+  if (elapsed < apiRequestLog.resetInterval && 
+      apiRequestLog.count >= apiRequestLog.maxRequestsPerInterval * 0.9) {
+    return true;
+  }
+  return false;
+};
+
+// Adaptive throttling based on current usage
+const throttleIfNeeded = async () => {
+  if (shouldThrottle()) {
+    const remainingTime = apiRequestLog.resetInterval - (Date.now() - apiRequestLog.timestamp);
+    console.log(`Approaching rate limit, throttling for ${remainingTime}ms`);
+    await sleep(remainingTime > 0 ? remainingTime : 1000);
+  }
+};
 
 const validateModuleContent = (content) => {
   if (!content?.title || !Array.isArray(content?.sections)) return false;
@@ -179,8 +303,37 @@ const isCodeRelatedTopic = (topic) => {
   );
 };
 
-// Main completion function using GROQ API with model fallbacks
-const llmCompletion = async (prompt, preferredModel = "llama3-70b-8192") => {
+// Function to automatically select the best model for the task
+const selectBestModel = (task, contentType, complexity = "medium", isInteractive = false) => {
+  // Match task requirements with model capabilities
+  if (isInteractive && complexity !== "high") {
+    // For interactive tasks where speed matters but not high complexity
+    return "llama-3.1-8b-instant";
+  }
+  
+  if (complexity === "high" && (contentType === "technical" || contentType === "code")) {
+    // For complex technical content or code generation
+    return "llama-3.3-70b-versatile";
+  }
+  
+  if (complexity === "medium" && contentType !== "technical") {
+    // For medium complexity non-technical content
+    return "llama3-8b-8192";
+  }
+  
+  // Default to the most capable model for other cases
+  return "llama-3.3-70b-versatile";
+};
+
+// Calculate exponential backoff with jitter for more effective retries
+const calculateBackoff = (attempt) => {
+  const exponentialDelay = BASE_RETRY_DELAY * Math.pow(2, attempt - 1);
+  const jitter = Math.random() * BASE_RETRY_DELAY;
+  return Math.min(exponentialDelay + jitter, MAX_RETRY_DELAY);
+};
+
+// Enhanced completion function with better error handling and rate limiting
+const llmCompletion = async (prompt, preferredModel = "llama-3.3-70b-versatile") => {
   // Start with preferred model, then fall back to others if needed
   const modelsToTry = [
     preferredModel,
@@ -188,55 +341,85 @@ const llmCompletion = async (prompt, preferredModel = "llama3-70b-8192") => {
   ];
 
   let lastError = null;
+  let statusCode = null;
+  let fallbackAttempt = 0;
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    for (const modelName of modelsToTry) {
-      try {
-        console.log(`Attempt ${attempt}: Trying GROQ with model: ${modelName}`);
+  // Implement throttling to prevent rate limit issues
+  await throttleIfNeeded();
+  apiRequestLog.count++;
 
-        const response = await axios.post(
-          GROQ_API_URL,
-          {
-            model: modelName,
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.3, // Lower temperature for factual responses
-            max_tokens: 4096,
-            top_p: 0.95,
-          },
-          {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${GROQ_API_KEY}`,
-            },
-          }
-        );
-
-        console.log(
-          `Successfully generated content with GROQ model: ${modelName}`
-        );
-        return response.data.choices[0].message.content;
-      } catch (error) {
-        lastError = error;
-        console.warn(
-          `GROQ model ${modelName} failed (attempt ${attempt}):`,
-          error.response?.data?.error?.message || error.message
-        );
-        // Continue to next model
-      }
-    }
+  // First attempt - try with the preferred model
+  try {
+    debugLog(`Initial attempt with preferred model: ${preferredModel}`);
+    const response = await callGroqApi(prompt, preferredModel);
+    return response;
+  } catch (initialError) {
+    lastError = initialError;
+    debugLog(`Preferred model ${preferredModel} failed, switching to fallbacks`, initialError.message);
+    statusCode = initialError.status || initialError.response?.status;
     
-    // If we've tried all models and failed, wait before retrying
-    if (attempt < MAX_RETRIES) {
-      console.log(`Waiting ${RETRY_DELAY}ms before retry attempt ${attempt + 1}...`);
-      await sleep(RETRY_DELAY * attempt); // Exponential backoff
+    // If we failed, continue with fallback logic below
+  }
+
+  // Fallback logic - try each remaining model in turn
+  const remainingModels = modelsToTry.filter(model => model !== preferredModel);
+  
+  for (let model of remainingModels) {
+    try {
+      debugLog(`Trying fallback model: ${model}`);
+      const response = await callGroqApi(prompt, model);
+      debugLog(`Successfully generated content with fallback model: ${model}`);
+      return response;
+    } catch (fallbackError) {
+      lastError = fallbackError;
+      debugLog(`Fallback model ${model} failed`, fallbackError.message);
+      // Continue to next model
     }
   }
 
-  // If we get here, all GROQ models failed after all retry attempts
-  throw new Error(`All GROQ models failed after ${MAX_RETRIES} attempts: ${lastError.message}`);
+  // If we get here, all models failed
+  const errorMessage = lastError?.response?.data?.error?.message || lastError?.message || "Unknown error";
+  debugLog(`All models failed after trying ${modelsToTry.length} models: ${errorMessage}`);
+  throw new Error(`All GROQ models failed: ${errorMessage}`);
 };
 
-// Updated module content generation function with only GROQ/Llama models
+// Helper function to make the actual API call - separated for cleaner error handling
+const callGroqApi = async (prompt, model) => {
+  try {
+    const response = await axios.post(
+      GROQ_API_URL,
+      {
+        model: model,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        max_tokens: 4096,
+        top_p: 0.95,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+        },
+        timeout: 30000,
+      }
+    );
+    
+    logApiRequest(model, true);
+    return response.data.choices[0].message.content;
+  } catch (error) {
+    logApiRequest(model, false, error);
+    
+    // Enhance the error with more context
+    const enhancedError = new Error(`GROQ API call failed with model ${model}: ${error.message}`);
+    enhancedError.status = error.response?.status;
+    enhancedError.originalError = error;
+    enhancedError.model = model;
+    
+    throw enhancedError;
+  }
+};
+
+// Updated module content generation function with newer models
 export const generateModuleContent = async (
   moduleName,
   options = { detailed: false }
@@ -250,6 +433,7 @@ export const generateModuleContent = async (
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       const isTechTopic = isCodeRelatedTopic(moduleName);
+      const contentComplexity = options.detailed ? "high" : "medium";
 
       // Enhanced prompt for content generation
       const prompt = `Generate factual educational content about: "${moduleName}"
@@ -310,10 +494,12 @@ export const generateModuleContent = async (
       
       ONLY RETURN VALID JSON WITHOUT ANY EXPLANATION OR INTRODUCTION.`;
 
-      // Select preferred model based on content type
-      const preferredModel = isTechTopic && options.detailed
-        ? "llama3-70b-8192" // Most powerful model for technical content
-        : "llama3-8b-8192"; // Use smaller model for non-technical content for efficiency
+      // Select the best model for this task
+      const preferredModel = selectBestModel(
+        "content-generation", 
+        isTechTopic ? "technical" : "general", 
+        contentComplexity
+      );
 
       const text = await llmCompletion(prompt, preferredModel);
       const result = sanitizeJSON(text);
@@ -338,7 +524,8 @@ export const generateModuleContent = async (
       console.error(`Module content generation attempt ${attempt} failed:`, error.message);
       
       if (attempt < MAX_RETRIES) {
-        await sleep(RETRY_DELAY * attempt); // Exponential backoff
+        const backoffTime = calculateBackoff(attempt);
+        await sleep(backoffTime); // Exponential backoff
       }
     }
   }
@@ -390,8 +577,9 @@ export const generateFlashcards = async (topic, numCards = 5) => {
       { "id": ${numCards}, "frontHTML": "Advanced question?", "backHTML": "Detailed advanced explanation." }
     ]`;
 
-    // Using the smaller Llama model for flashcards which are simpler
-    const text = await llmCompletion(prompt, "llama3-8b-8192");
+    // Using our automatic model selection for flashcards (simple, interactive content)
+    const selectedModel = selectBestModel("flashcards", "educational", "medium", true);
+    const text = await llmCompletion(prompt, selectedModel);
     
     try {
       const result = sanitizeJSON(text);
@@ -502,8 +690,18 @@ export const generateQuizData = async (
         .join(" ")}.
     `;
 
-    // Use the larger model for quiz generation as it requires more complex reasoning
-    const resultText = await llmCompletion(prompt, "llama3-70b-8192");
+    // Determine complexity based on whether we have content and number of questions
+    const complexity = hasContent && numQuestions > 5 ? "high" : "medium";
+    const isTechTopic = isCodeRelatedTopic(cleanTopic);
+    
+    // Select appropriate model based on task requirements
+    const selectedModel = selectBestModel(
+      "quiz-generation",
+      isTechTopic ? "technical" : "educational",
+      complexity
+    );
+    
+    const resultText = await llmCompletion(prompt, selectedModel);
 
     // Extract JSON from the response
     const jsonMatch = resultText.match(/\{[\s\S]*\}/);
@@ -567,8 +765,9 @@ export const generateChatResponse = async (message, context) => {
       Be concise and helpful. Answer the following: ${message}
     `;
 
-    // Use the larger model for chat responses as they require deeper understanding
-    return await llmCompletion(contextPrompt, "llama3-70b-8192");
+    // Interactive chat responses should be fast, use the instant model
+    const selectedModel = selectBestModel("chat", "general", "medium", true);
+    return await llmCompletion(contextPrompt, selectedModel);
   } catch (error) {
     console.error("Chat generation error:", error);
     throw new Error("Failed to generate response");
@@ -602,8 +801,15 @@ export const generateQuiz = async (moduleName, numQuestions) => {
       ]
     }`;
 
-    // Use llama3-8b for quiz generation since it's a relatively simple structure
-    const text = await llmCompletion(prompt, "llama3-8b-8192");
+    // Select the appropriate model based on complexity and topic
+    const isTechTopic = isCodeRelatedTopic(moduleName);
+    const selectedModel = selectBestModel(
+      "quiz-generation", 
+      isTechTopic ? "technical" : "educational", 
+      "medium"
+    );
+    
+    const text = await llmCompletion(prompt, selectedModel);
 
     try {
       const result = sanitizeJSON(text);
@@ -666,14 +872,15 @@ export const generateQuiz = async (moduleName, numQuestions) => {
   }
 };
 
-// Helper function to retry API calls
-const retry = async (fn, retries = MAX_RETRIES, delay = RETRY_DELAY) => {
+// Enhanced retry function with improved backoff strategy
+const retry = async (fn, retries = MAX_RETRIES, delay = BASE_RETRY_DELAY) => {
   try {
     return await fn();
   } catch (error) {
     if (retries > 0) {
-      console.log(`Retrying... Attempts left: ${retries - 1}`);
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      const backoffTime = calculateBackoff(retries);
+      console.log(`Retrying... Attempts left: ${retries - 1}, waiting ${backoffTime}ms`);
+      await sleep(backoffTime);
       return retry(fn, retries - 1, delay);
     }
     throw error;
@@ -723,11 +930,19 @@ export const generateLearningPath = async (
       `;
     }
 
-    // Use the larger model for career paths (more complex) and smaller model for simple paths
-    const modelToUse = isCareerPath ? "llama3-70b-8192" : "llama3-8b-8192";
+    // Determine complexity and choose appropriate model
+    const complexity = isCareerPath ? "high" : "medium";
+    const isTechTopic = isCodeRelatedTopic(goal);
+    
+    // Select best model based on requirements
+    const selectedModel = selectBestModel(
+      "learning-path", 
+      isTechTopic ? "technical" : "educational", 
+      complexity
+    );
     
     // Use retry pattern for all path generation
-    const text = await retry(() => llmCompletion(prompt, modelToUse));
+    const text = await retry(() => llmCompletion(prompt, selectedModel));
 
     try {
       // Extract JSON from the response
@@ -924,11 +1139,14 @@ export const generatePersonalizedCareerPaths = async (userData) => {
 
     // Use Promise.race with a timeout to handle potentially slow responses
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Request timed out")), 30000)
+      setTimeout(() => reject(new Error("Request timed out")), 45000) // Increased timeout
     );
 
     // This is a complex task requiring the most capable model
-    const resultPromise = retry(() => llmCompletion(prompt, "llama3-70b-8192"));
+    const selectedModel = "llama-3.3-70b-versatile"; // Always use the most capable model for career paths
+    
+    // Use the retry mechanism with our improved LLM completion function
+    const resultPromise = retry(() => llmCompletion(prompt, selectedModel));
     const text = await Promise.race([resultPromise, timeoutPromise]);
 
     try {
@@ -1375,8 +1593,9 @@ export const generateAINudges = async (
     Keep texts concise (max 150 characters).
     One nudge should be a "challenge" type.`;
 
-    // Nudges can use the smaller model as they're simpler content
-    const response = await llmCompletion(prompt, "llama3-8b-8192");
+    // Nudges are simple content, use a faster model
+    const selectedModel = selectBestModel("nudges", "educational", "low", true);
+    const response = await llmCompletion(prompt, selectedModel);
     const result = sanitizeJSON(response);
     
     // Check if sanitizeJSON returned an already parsed object
@@ -1453,10 +1672,323 @@ export const generateCareerSummary = async ({
     
     Avoid bullet points in the final report. Make it natural, inspiring, and rich in value.`;
 
-    // This is a complex narrative task requiring the most capable model
-    return await llmCompletion(prompt, "llama3-70b-8192");
+    // This is a complex narrative task requiring the most capable model with long context
+    const selectedModel = "llama-3.3-70b-versatile"; // Best for long narrative generation
+    return await llmCompletion(prompt, selectedModel);
   } catch (error) {
     console.error("❌ Career Summary Generation Error:", error);
     throw error;
+  }
+};
+
+// Helper function to generate default modules for a path
+const generateDefaultModules = (pathName, count) => {
+  return Array.from({ length: count }, (_, index) => {
+    const level = index === 0 ? "basic" : index === count - 1 ? "advanced" : "intermediate";
+    return {
+      title: `Module ${index + 1}: ${level.charAt(0).toUpperCase() + level.slice(1)} ${pathName}`,
+      description: `Learn ${level} concepts and skills related to ${pathName}`,
+      estimatedHours: 8 + index,
+      keySkills: [`${level} understanding`, `${level} application`, `${level} skills`],
+    };
+  });
+};
+
+// Function to adjust content based on device type for responsive design
+export const getResponsiveContent = (content, deviceType = "desktop") => {
+  if (!content) return null;
+  
+  // Default sizing and formatting
+  let responsiveContent = { ...content };
+  
+  // Adjust based on device type
+  if (deviceType === "mobile") {
+    // For mobile: simplify content, reduce verbosity
+    if (responsiveContent.sections) {
+      responsiveContent.sections = responsiveContent.sections.map(section => {
+        // Shorten content for mobile if it's too long
+        let mobileContent = section.content;
+        if (section.content && section.content.length > 500) {
+          mobileContent = section.content.substring(0, 500) + "...";
+        }
+        
+        return {
+          ...section,
+          content: mobileContent,
+          // If code examples exist, simplify them for mobile
+          codeExample: section.codeExample ? {
+            ...section.codeExample,
+            code: section.codeExample.code.length > 300 
+              ? section.codeExample.code.substring(0, 300) + "\n// ... more code ..." 
+              : section.codeExample.code
+          } : null
+        };
+      });
+    }
+  } else if (deviceType === "tablet") {
+    // For tablets: moderate adjustments
+    if (responsiveContent.sections) {
+      responsiveContent.sections = responsiveContent.sections.map(section => {
+        // Moderate content length for tablets
+        let tabletContent = section.content;
+        if (section.content && section.content.length > 1000) {
+          tabletContent = section.content.substring(0, 1000) + "...";
+        }
+        
+        return {
+          ...section,
+          content: tabletContent,
+          // Slightly simplify code examples for tablets if needed
+          codeExample: section.codeExample ? {
+            ...section.codeExample,
+            code: section.codeExample.code.length > 500
+              ? section.codeExample.code.substring(0, 500) + "\n// ... more code ..."
+              : section.codeExample.code
+          } : null
+        };
+      });
+    }
+  }
+  
+  return responsiveContent;
+};
+
+// Function to detect device type from user agent or screen size
+export const detectDeviceType = (userAgent, screenWidth = 1920) => {
+  // First check based on user agent
+  const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+  
+  if (isMobileDevice) {
+    // If tablet-specific UA detected
+    if (/iPad|Tablet/i.test(userAgent)) {
+      return "tablet";
+    }
+    return "mobile";
+  }
+  
+  // Fallback to screen width detection
+  if (screenWidth < 768) {
+    return "mobile";
+  } else if (screenWidth < 1024) {
+    return "tablet";
+  }
+  
+  return "desktop";
+};
+
+// Function to determine if we can use the most advanced models for the user's connection
+export const canUseAdvancedModels = async () => {
+  try {
+    const startTime = Date.now();
+    // Perform a small test request to measure connection speed
+    const response = await fetch("https://api.groq.com/openai/v1/models", {
+      method: "HEAD",
+      headers: {
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
+      },
+    });
+    const endTime = Date.now();
+    const latency = endTime - startTime;
+    
+    // If latency is less than 300ms, assume good connection
+    return response.ok && latency < 300;
+  } catch (error) {
+    console.warn("Connection check failed, defaulting to moderate models", error);
+    return false;
+  }
+};
+
+// Function to elaborate on specific topics, with fallback handling
+export const generateTopicElaboration = async (topic, moduleName, options = {}) => {
+  if (!topic || typeof topic !== "string") {
+    throw new Error("Invalid topic provided");
+  }
+
+  // Create full topic by combining module name and specific topic
+  const fullTopic = moduleName ? `${moduleName}: ${topic}` : topic;
+  
+  try {
+    // Set default options
+    const elaborationOptions = {
+      detailed: true,
+      includeExamples: true,
+      constrainToFacts: true,
+      preventHallucination: true,
+      ...options
+    };
+
+    // Determine if this is a code-related topic
+    const isTechTopic = isCodeRelatedTopic(fullTopic);
+    const isKeyPoints = fullTopic.toLowerCase().includes("key points");
+    
+    // Select appropriate models - use faster model first, then fall back to more capable ones if needed
+    const preferredModel = "llama-3.1-8b-instant";
+    const fallbackModels = [
+      "llama3-70b-8192", // First fallback
+      "llama-3.3-70b-versatile", // More capable fallback
+      "gemma2-9b-it", // Alternative model family
+    ];
+    
+    // Enhanced prompt specifically for elaborations
+    const prompt = `
+    Provide a detailed, educational elaboration on the topic: "${fullTopic}"
+    
+    Requirements:
+    - Be factual, precise, and educational
+    - Keep the tone academic but engaging
+    - Focus on clarifying complex concepts
+    - Include practical examples ${isTechTopic ? "and code samples" : ""}
+    - Highlight key insights that aren't obvious
+    - Match the visual theme: dark background with amber/orange highlight colors
+    
+    ${isKeyPoints ? "This topic is asking for key points, so organize content as concise, actionable insights" : ""}
+    ${isTechTopic ? "Since this is a technical topic, include relevant code examples with explanations" : ""}
+    
+    Return your response in this exact JSON format:
+    {
+      "title": "Concise title for this elaboration",
+      "sections": [
+        {
+          "title": "Section Heading",
+          "content": "Detailed explanation with examples and clarifications",
+          "keyPoints": ["Key insight 1", "Key insight 2", "Key insight 3"],
+          ${isTechTopic ? `
+          "codeExample": {
+            "language": "appropriate language",
+            "code": "// Code sample\\nfunction example() {\\n  // Implementation\\n}",
+            "explanation": "How this code works"
+          }` : '"codeExample": null'}
+        }
+      ],
+      "modelUsed": "${preferredModel}"
+    }`;
+
+    // Track which model was used
+    let modelUsed = "";
+    let elaborationContent = null;
+    let success = false;
+
+    // Try with preferred model first
+    try {
+      console.log(`Generating elaboration using ${preferredModel}`);
+      const text = await llmCompletion(prompt, preferredModel);
+      const result = sanitizeJSON(text);
+      elaborationContent = typeof result === 'string' ? JSON5.parse(result) : result;
+      
+      // Add the model used if not included in response
+      if (!elaborationContent.modelUsed) {
+        elaborationContent.modelUsed = preferredModel;
+      }
+      
+      modelUsed = elaborationContent.modelUsed;
+      success = true;
+      console.log(`Successfully generated content with ${preferredModel}`);
+    } catch (primaryError) {
+      console.warn(`Primary model ${preferredModel} failed: ${primaryError.message}`);
+      
+      // Try fallback models in sequence - explicit error handling for each fallback
+      for (const fallbackModel of fallbackModels) {
+        if (success) break;
+        
+        try {
+          debugLog(`Trying fallback model: ${fallbackModel}`);
+          
+          // Create a model-specific prompt that includes the model name
+          const fallbackPrompt = prompt.replace(`"modelUsed": "${preferredModel}"`, `"modelUsed": "${fallbackModel}"`);
+          
+          const text = await llmCompletion(fallbackPrompt, fallbackModel);
+          const result = sanitizeJSON(text);
+          elaborationContent = typeof result === 'string' ? JSON5.parse(result) : result;
+          
+          // Validate the response has required structure
+          if (!elaborationContent || !elaborationContent.sections || elaborationContent.sections.length === 0) {
+            throw new Error("Invalid content structure from fallback model");
+          }
+          
+          // Add the model used if not included in response
+          if (!elaborationContent.modelUsed) {
+            elaborationContent.modelUsed = fallbackModel;
+          }
+          
+          modelUsed = elaborationContent.modelUsed;
+          success = true;
+          debugLog(`Successfully generated content with fallback model ${fallbackModel}`);
+        } catch (fallbackError) {
+          console.warn(`Fallback model ${fallbackModel} failed: ${fallbackError.message}`);
+        }
+      }
+      
+      if (!success) {
+        console.error("All models failed to generate elaboration");
+        throw new Error("All models failed to generate elaboration");
+      }
+    }
+    
+    // Ensure the content matches the theme of the site
+    elaborationContent = themeElaborationContent(elaborationContent);
+    
+    return elaborationContent;
+  } catch (error) {
+    console.error("Elaboration generation error:", error);
+    
+    // Return a structured error response rather than throwing
+    return {
+      title: topic,
+      modelUsed: "Fallback Content",
+      error: "We couldn't generate the elaboration. Please try again.",
+      sections: [
+        {
+          title: "Unable to Elaborate",
+          content: `We're having trouble generating detailed content for "${topic}". This might be due to temporary issues with our AI service.`,
+          keyPoints: [
+            "Try again in a few moments",
+            "Try a more specific topic",
+            "Explore other sections of the module"
+          ]
+        }
+      ]
+    };
+  }
+};
+
+// Helper function to ensure elaboration content matches site theme
+const themeElaborationContent = (content) => {
+  if (!content) return null;
+  
+  // Create a copy to avoid mutating the original
+  const themedContent = { ...content };
+  
+  // Add theme-specific metadata to help UI components
+  themedContent.theme = {
+    primary: "#ff9d54", // Primary amber/orange color used in the UI
+    secondary: "#3a3a3a", // Secondary dark color
+    background: "#2a2a2a", // Background color
+    text: "#ffffff", // Text color
+    accent: "#ff8a30", // Accent color
+    codeBackground: "#1e1e1e", // Code block background
+  };
+  
+  // Add responsive display options
+  themedContent.display = {
+    showCodeExamples: true,
+    collapsibleSections: true,
+    animateEntrance: true,
+  };
+  
+  return themedContent;
+};
+
+// Add this function at the end of the file to test fallback mechanism
+export const testModelFallback = async () => {
+  debugLog("Testing model fallback mechanism...");
+  
+  try {
+    // Try with a prompt that should work on any model
+    const result = await llmCompletion("Generate a simple greeting", "invalid-model-name");
+    debugLog("Test completed with result", result.substring(0, 50) + "...");
+    return { success: true, message: "Fallback mechanism working correctly" };
+  } catch (error) {
+    debugLog("Fallback test failed", error);
+    return { success: false, message: error.message };
   }
 };
