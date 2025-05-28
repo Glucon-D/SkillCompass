@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { generateModuleContent } from "../config/llm";
+import { generateModuleContent, generateTopicElaboration } from "../config/llm";
 import { updatePoints } from "../config/database";
 import {
   updateLearningPathProgress,
@@ -211,18 +211,14 @@ const ModuleDetails = () => {
     setElaborationContent(null);
 
     try {
-      // Build a more specific prompt for the topic
-      const fullTopic = `${moduleName}: ${topic}`;
-
-      const elaboration = await generateModuleContent(fullTopic, {
+      // Use the specialized elaboration function with fallback handling
+      const elaboration = await generateTopicElaboration(topic, moduleName, {
         detailed: true,
-        includeExamples: true,
-        constrainToFacts: true,
-        preventHallucination: true,
+        includeExamples: true
       });
 
+      // Update model used display if available
       if (elaboration.modelUsed) {
-        // Update which model was used for elaboration
         setModelUsed(elaboration.modelUsed);
       }
 
@@ -232,6 +228,13 @@ const ModuleDetails = () => {
       setElaborationContent({
         title: topic,
         error: "Failed to generate elaboration. Please try again.",
+        theme: {
+          primary: "#ff9d54",
+          secondary: "#3a3a3a",
+          background: "#2a2a2a",
+          text: "#ffffff",
+          accent: "#ff8a30"
+        }
       });
     } finally {
       setLoadingElaboration(false);
@@ -371,24 +374,38 @@ const ModuleDetails = () => {
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"
+            className="bg-[#2a2a2a] rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col border border-[#3a3a3a]"
+            style={{ 
+              backgroundColor: elaborationContent?.theme?.background || "#2a2a2a", 
+              color: elaborationContent?.theme?.text || "#ffffff"
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="p-3 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+            <div className="p-3 sm:p-6 border-b border-[#3a3a3a] flex justify-between items-center sticky top-0 z-10"
+                 style={{ borderColor: elaborationContent?.theme?.secondary || "#3a3a3a", 
+                          backgroundColor: elaborationContent?.theme?.background || "#2a2a2a" }}>
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg">
-                  <RiBrainLine className="text-blue-600 w-4 h-4 sm:w-5 sm:h-5" />
+                <div className="p-1.5 sm:p-2 rounded-lg"
+                     style={{ backgroundColor: `${elaborationContent?.theme?.primary || "#ff9d54"}20` }}>
+                  <RiBrainLine className="w-4 h-4 sm:w-5 sm:h-5"
+                               style={{ color: elaborationContent?.theme?.primary || "#ff9d54" }} />
                 </div>
-                <h2 className="text-base sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent truncate max-w-[200px] sm:max-w-md">
-                  {elaborationTopic}
+                <h2 className="text-base sm:text-xl font-bold truncate max-w-[200px] sm:max-w-md"
+                    style={{ 
+                      background: `linear-gradient(to right, ${elaborationContent?.theme?.primary || "#ff9d54"}, ${elaborationContent?.theme?.accent || "#ff8a30"})`,
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent"
+                    }}>
+                  {elaborationContent?.title || elaborationTopic}
                 </h2>
               </div>
               <button
                 onClick={closePopup}
-                className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-1.5 sm:p-2 hover:bg-[#3a3a3a] rounded-full transition-colors"
+                style={{ color: elaborationContent?.theme?.text || "#ffffff" }}
               >
-                <RiCloseLine className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
+                <RiCloseLine className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
 
@@ -403,30 +420,46 @@ const ModuleDetails = () => {
                       repeat: Infinity,
                       ease: "linear",
                     }}
-                    className="w-8 sm:w-10 h-8 sm:h-10 border-3 sm:border-4 border-blue-200 border-t-blue-600 rounded-full mb-4"
+                    className="w-8 sm:w-10 h-8 sm:h-10 border-3 sm:border-4 rounded-full mb-4"
+                    style={{ 
+                      borderColor: `${elaborationContent?.theme?.primary || "#ff9d54"}30`,
+                      borderTopColor: elaborationContent?.theme?.primary || "#ff9d54" 
+                    }}
                   />
-                  <p className="text-sm sm:text-base text-gray-600">
+                  <p className="text-sm sm:text-base" 
+                     style={{ color: elaborationContent?.theme?.primary || "#ff9d54" }}>
                     Generating detailed explanation...
                   </p>
-                  <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                  <p className="text-xs sm:text-sm mt-2"
+                     style={{ color: `${elaborationContent?.theme?.text || "#ffffff"}80` }}>
                     Using GROQ's advanced LLMs
                   </p>
                 </div>
               ) : elaborationContent?.error ? (
-                <div className="bg-red-50 p-4 sm:p-6 rounded-xl text-center">
+                <div className="p-4 sm:p-6 rounded-xl text-center" 
+                     style={{ backgroundColor: `${elaborationContent?.theme?.primary || "#ff9d54"}10` }}>
                   <p className="text-red-600 text-sm sm:text-base">
                     {elaborationContent.error}
                   </p>
                   <button
                     onClick={() => handleElaborate(elaborationTopic)}
-                    className="mt-4 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg flex items-center gap-2 mx-auto text-sm"
+                    className="mt-4 px-4 py-2 rounded-lg flex items-center gap-2 mx-auto text-sm"
+                    style={{ 
+                      backgroundColor: `${elaborationContent?.theme?.primary || "#ff9d54"}20`,
+                      color: elaborationContent?.theme?.primary || "#ff9d54" 
+                    }}
                   >
                     <RiRefreshLine /> Try Again
                   </button>
                 </div>
               ) : elaborationContent ? (
                 <div className="space-y-4 sm:space-y-6">
-                  <div className="border-l-4 border-blue-500 pl-3 sm:pl-4 py-1.5 sm:py-2 italic text-gray-600 bg-blue-50/50 rounded-r-lg text-xs sm:text-sm">
+                  <div className="border-l-4 pl-3 sm:pl-4 py-1.5 sm:py-2 italic rounded-r-lg text-xs sm:text-sm"
+                       style={{ 
+                         borderColor: elaborationContent?.theme?.primary || "#ff9d54",
+                         backgroundColor: `${elaborationContent?.theme?.primary || "#ff9d54"}10`,
+                         color: `${elaborationContent?.theme?.text || "#ffffff"}CC` 
+                       }}>
                     <p>
                       A deeper exploration into {elaborationTopic}, expanding on
                       the concepts covered in the module.
@@ -439,22 +472,36 @@ const ModuleDetails = () => {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: idx * 0.1 }}
-                      className="bg-white border border-gray-200 p-3 sm:p-5 rounded-xl shadow-sm"
+                      className="border p-3 sm:p-5 rounded-xl shadow-sm"
+                      style={{ 
+                        backgroundColor: `${elaborationContent?.theme?.secondary || "#3a3a3a"}40`,
+                        borderColor: `${elaborationContent?.theme?.secondary || "#3a3a3a"}80` 
+                      }}
                     >
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2 sm:mb-3">
+                      <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3"
+                          style={{ 
+                            background: `linear-gradient(to right, ${elaborationContent?.theme?.primary || "#ff9d54"}, ${elaborationContent?.theme?.accent || "#ff8a30"})`,
+                            WebkitBackgroundClip: "text",
+                            WebkitTextFillColor: "transparent" 
+                          }}>
                         {section.title}
                       </h3>
-                      <div className="prose prose-sm max-w-none text-xs sm:text-sm">
+                      <div className="prose prose-sm max-w-none text-xs sm:text-sm"
+                           style={{ color: elaborationContent?.theme?.text || "#ffffff" }}>
                         <ReactMarkdown components={renderers}>
                           {section.content}
                         </ReactMarkdown>
                       </div>
 
                       {section.codeExample && section.codeExample.code && (
-                        <div className="mt-3 sm:mt-4 bg-gray-900 rounded-lg overflow-hidden">
-                          <div className="bg-gray-800 px-3 py-1.5 sm:px-4 sm:py-2 text-xs text-gray-400 flex items-center gap-2">
-                            <RiCodeLine />
-                            <span>{section.codeExample.language}</span>
+                        <div className="mt-3 sm:mt-4 rounded-lg overflow-hidden"
+                             style={{ backgroundColor: elaborationContent?.theme?.codeBackground || "#1e1e1e" }}>
+                          <div className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs flex items-center gap-2"
+                               style={{ backgroundColor: `${elaborationContent?.theme?.codeBackground || "#1e1e1e"}CC` }}>
+                            <RiCodeLine style={{ color: `${elaborationContent?.theme?.text || "#ffffff"}80` }} />
+                            <span style={{ color: `${elaborationContent?.theme?.text || "#ffffff"}80` }}>
+                              {section.codeExample.language}
+                            </span>
                           </div>
                           <SyntaxHighlighter
                             language={
@@ -467,7 +514,12 @@ const ModuleDetails = () => {
                             {section.codeExample.code}
                           </SyntaxHighlighter>
                           {section.codeExample.explanation && (
-                            <div className="px-3 sm:px-4 py-2 bg-gray-800 text-gray-300 text-xs sm:text-sm border-t border-gray-700">
+                            <div className="px-3 sm:px-4 py-2 text-xs sm:text-sm border-t"
+                                 style={{ 
+                                   backgroundColor: `${elaborationContent?.theme?.codeBackground || "#1e1e1e"}80`,
+                                   borderColor: `${elaborationContent?.theme?.secondary || "#3a3a3a"}80`,
+                                   color: `${elaborationContent?.theme?.text || "#ffffff"}CC`
+                                 }}>
                               {section.codeExample.explanation}
                             </div>
                           )}
@@ -475,11 +527,17 @@ const ModuleDetails = () => {
                       )}
 
                       {section.keyPoints && section.keyPoints.length > 0 && (
-                        <div className="mt-3 sm:mt-4 bg-blue-50 p-2 sm:p-3 rounded-lg">
-                          <h4 className="text-xs sm:text-sm font-medium text-blue-700 mb-1 sm:mb-2">
+                        <div className="mt-3 sm:mt-4 p-2 sm:p-3 rounded-lg"
+                             style={{ 
+                               backgroundColor: `${elaborationContent?.theme?.primary || "#ff9d54"}10`,
+                               borderColor: `${elaborationContent?.theme?.primary || "#ff9d54"}30` 
+                             }}>
+                          <h4 className="text-xs sm:text-sm font-medium mb-1 sm:mb-2"
+                              style={{ color: elaborationContent?.theme?.primary || "#ff9d54" }}>
                             Key Takeaways
                           </h4>
-                          <ul className="list-disc pl-4 sm:pl-5 text-xs sm:text-sm text-gray-700">
+                          <ul className="list-disc pl-4 sm:pl-5 text-xs sm:text-sm"
+                              style={{ color: `${elaborationContent?.theme?.text || "#ffffff"}CC` }}>
                             {section.keyPoints.map((point, idx) => (
                               <li key={idx} className="mb-0.5 sm:mb-1">
                                 {point}
@@ -495,8 +553,13 @@ const ModuleDetails = () => {
             </div>
 
             {/* Footer */}
-            <div className="p-2 sm:p-4 border-t border-gray-200 bg-gray-50 text-center text-xs text-gray-500">
-              Content powered by {modelUsed}
+            <div className="p-2 sm:p-4 border-t text-center text-xs"
+                 style={{ 
+                   borderColor: elaborationContent?.theme?.secondary || "#3a3a3a",
+                   backgroundColor: `${elaborationContent?.theme?.secondary || "#3a3a3a"}30`,
+                   color: `${elaborationContent?.theme?.text || "#ffffff"}80`
+                 }}>
+              Content powered by {elaborationContent?.modelUsed || modelUsed}
             </div>
           </motion.div>
         </motion.div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { account } from '../config/appwrite';
@@ -99,14 +99,35 @@ const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [passwordStrength, setPasswordStrength] = useState('');
-  const [passwordScore, setPasswordScore] = useState(0);
 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
   });
+
+  // Memoized password strength calculation
+  const passwordAnalysis = useMemo(() => {
+    const password = formData.password;
+    if (!password) return { checks: {}, score: 0, strength: '' };
+
+    const checks = {
+      length: password.length >= 8,
+      lowercase: /[a-z]/.test(password),
+      uppercase: /[A-Z]/.test(password),
+      number: /\d/.test(password),
+      special: /[^A-Za-z0-9]/.test(password),
+    };
+
+    const score = Object.values(checks).filter(Boolean).length;
+    
+    let strength = '';
+    if (score <= 2) strength = 'Weak';
+    else if (score === 3 || score === 4) strength = 'Moderate';
+    else strength = 'Strong';
+
+    return { checks, score, strength };
+  }, [formData.password]);
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -139,26 +160,6 @@ const Signup = () => {
       setLoading(false);
     }
   };
-  const evaluatePasswordStrength = (password) => {
-    let score = 0;
-    const checks = {
-      length: password.length >= 8,
-      lowercase: /[a-z]/.test(password),
-      uppercase: /[A-Z]/.test(password),
-      number: /\d/.test(password),
-      special: /[^A-Za-z0-9]/.test(password),
-    };
-
-    score = Object.values(checks).filter(Boolean).length;
-    setPasswordScore(score);
-
-    if (score <= 2) setPasswordStrength('Weak');
-    else if (score === 3 || score === 4) setPasswordStrength('Moderate');
-    else setPasswordStrength('Strong');
-
-    return checks;
-  };
-
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1c1b1b] via-[#252525] to-[#1c1b1b] relative overflow-hidden">
@@ -283,9 +284,7 @@ const Signup = () => {
                 hover:border-[#ff9d54]/30 transition-all duration-300"
                 value={formData.password}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  setFormData({ ...formData, password: val });
-                  evaluatePasswordStrength(val);
+                  setFormData({ ...formData, password: e.target.value });
                 }}
               />
               <button
@@ -301,6 +300,7 @@ const Signup = () => {
               </button>
             </div>
           </motion.div>
+
           {/* Password Strength Indicator */}
           <AnimatePresence>
             {formData.password && (
@@ -316,20 +316,20 @@ const Signup = () => {
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-gray-400">Password Strength</span>
                     <span className={`text-xs font-medium ${
-                      passwordStrength === 'Weak' ? 'text-red-400' :
-                      passwordStrength === 'Moderate' ? 'text-yellow-400' : 'text-green-400'
+                      passwordAnalysis.strength === 'Weak' ? 'text-red-400' :
+                      passwordAnalysis.strength === 'Moderate' ? 'text-yellow-400' : 'text-green-400'
                     }`}>
-                      {passwordStrength}
+                      {passwordAnalysis.strength}
                     </span>
                   </div>
                   <div className="h-2 rounded-full bg-[#3a3a3a] overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${(passwordScore / 5) * 100}%` }}
+                      animate={{ width: `${(passwordAnalysis.score / 5) * 100}%` }}
                       transition={{ duration: 0.5, ease: [0.4, 0, 0.6, 1] }}
                       className={`h-full transition-colors duration-300 ${
-                        passwordStrength === 'Weak' ? 'bg-red-500' :
-                        passwordStrength === 'Moderate' ? 'bg-yellow-500' : 'bg-green-500'
+                        passwordAnalysis.strength === 'Weak' ? 'bg-red-500' :
+                        passwordAnalysis.strength === 'Moderate' ? 'bg-yellow-500' : 'bg-green-500'
                       }`}
                     />
                   </div>
@@ -337,7 +337,7 @@ const Signup = () => {
 
                 {/* Password Requirements */}
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  {Object.entries(evaluatePasswordStrength(formData.password)).map(([key, met]) => (
+                  {Object.entries(passwordAnalysis.checks).map(([key, met]) => (
                     <div key={key} className={`flex items-center gap-1 ${met ? 'text-green-400' : 'text-gray-500'}`}>
                       <RiCheckLine className={`w-3 h-3 ${met ? 'text-green-400' : 'text-gray-500'}`} />
                       <span>
